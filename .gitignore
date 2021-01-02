@@ -1,0 +1,14 @@
+# Project stuff
+.*/
+*~
+bin/
+*.kdev4
+
+# Generated stuff
+CMakeFiles/
+Makefile
+cmake_install.cmake
+CMakeCache.txt
+
+*.diff
+*.patch

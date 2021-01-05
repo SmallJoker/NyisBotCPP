@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.6)
 set(CMAKE_CXX_STANDARD 11)
 project(NyisBotCPP)
 
+# perhaps libuv as an alternative?
 find_package(CURL REQUIRED)
 find_package(Threads REQUIRED) # pthread
 
@@ -12,8 +13,10 @@ endif()
 
 # Source files
 set(SRC_FILES
-	*.cpp
-	modules/*.cpp
+	connection.cpp
+	logger.cpp
+	main.cpp
+	#modules/*.cpp
 )
 
 # Include Directories

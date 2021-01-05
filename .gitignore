@@ -2,6 +2,7 @@
 .*/
 *~
 bin/
+build/
 *.kdev4
 
 # Generated stuff

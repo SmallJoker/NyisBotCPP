@@ -1,12 +1,13 @@
-
 #include "inc/connection.h"
 #include "inc/logger.h"
 #include <curl/curl.h>
 #include <sstream>
 
+
 #define SLEEP_MS(ms) \
 	std::this_thread::sleep_for(std::chrono::milliseconds((ms)));
 
+	
 Connection::Connection(const std::string &address, int port)
 {
     // Open connection
@@ -41,7 +42,7 @@ Connection::~Connection()
 	m_is_alive = false;
 	m_thread.join();
 
-    // Disconnect
+	// Disconnect
 	curl_easy_cleanup(m_curl);
 	curl_global_cleanup();
 }
@@ -91,7 +92,8 @@ std::string *Connection::popRecv()
 
 size_t Connection::recv(std::string &data)
 {
-	char buf[RECEIVE_BUFSIZE];
+	// Re-use memory wherever possible
+	thread_local char buf[RECEIVE_BUFSIZE];
 
 	size_t nread = 0;
 	CURLcode res = curl_easy_recv(m_curl, buf, sizeof(buf), &nread);
@@ -109,7 +111,9 @@ size_t Connection::recv(std::string &data)
 
 void Connection::recvAsync(Connection *con)
 {
+	// Receive thread function
 	std::string data;
+
 	while (con->m_is_alive) {
 		size_t nread = con->recv(data);
 		if (nread == 0) {
@@ -117,6 +121,7 @@ void Connection::recvAsync(Connection *con)
 			continue;
 		}
 		LOG(">> Received " << nread << " bytes");
+
 		size_t offset = 0;
 		while (true) {
 			// Search for newlines and split
@@ -136,12 +141,14 @@ void Connection::recvAsync(Connection *con)
 
 			int length = index - offset;
 
-			con->m_recv_queue_lock.lock();
-			con->m_recv_queue.push(data.substr(offset, length));
-			LOG("Got line: " << con->m_recv_queue.back());
-			con->m_recv_queue_lock.unlock();
+			{
+				con->m_recv_queue_lock.lock();
+				con->m_recv_queue.push(data.substr(offset, length));
+				LOG("Got line: " << con->m_recv_queue.back());
+				con->m_recv_queue_lock.unlock();
+			}
 
-			offset += length + 1; // '\n'
+			offset += length + 1; // + '\n'
 		}
 
 		if (offset > 0) {

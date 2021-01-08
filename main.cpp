@@ -4,7 +4,7 @@
 int main()
 {
 	LOG("Startup");
-    Connection con("http://example.com", 80);
+	Connection con("http://example.com", 80);
 	
     return 0;
 }

@@ -18,7 +18,7 @@ public:
 private:
 	const unsigned MAX_RETRIES = 5;
 	const unsigned CURL_TIMEOUT = 3000;
-	const unsigned RECEIVE_BUFSIZE = 1024;
+	static constexpr unsigned RECEIVE_BUFSIZE = 1024;
 
 	size_t recv(std::string &data);
 	static void recvAsync(Connection *con);

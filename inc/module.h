@@ -10,9 +10,8 @@ class Channel;
 class ICallbackHandler {
 public:
 	struct ChatInfo {
-		std::string name;
+		std::string nickname;
 		std::vector<std::string> parts;
-		size_t length;
 	};
 
 	virtual void onUserJoin(const std::string &name) {}
@@ -20,6 +19,7 @@ public:
 	virtual void onUserRename(const std::string &old_name, const std::string &new_name) {}
 	virtual void onUserSay(const ChatInfo &info) {}
 };
+
 
 class Module : public ICallbackHandler {
 public:
@@ -33,6 +33,7 @@ protected:
 private:
 	const std::string m_name;
 };
+
 
 class BotManager : public ICallbackHandler {
 public:

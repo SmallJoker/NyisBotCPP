@@ -13,9 +13,11 @@ endif()
 
 # Source files
 set(SRC_FILES
+	client.cpp
 	connection.cpp
 	logger.cpp
 	main.cpp
+	settings.cpp
 	#modules/*.cpp
 )
 

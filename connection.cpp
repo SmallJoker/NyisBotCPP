@@ -16,6 +16,7 @@ Connection::Connection(const std::string &address, int port)
 	m_curl = curl_easy_init();
 	ASSERT(m_curl, "CURL init failed");
 	curl_easy_setopt(m_curl, CURLOPT_URL, address.c_str());
+	curl_easy_setopt(m_curl, CURLOPT_PORT, (long)port);
 	curl_easy_setopt(m_curl, CURLOPT_CONNECT_ONLY, 1L);
 	curl_easy_setopt(m_curl, CURLOPT_TCP_KEEPALIVE, 1L);
 	curl_easy_setopt(m_curl, CURLOPT_USE_SSL, (long)CURLUSESSL_ALL);

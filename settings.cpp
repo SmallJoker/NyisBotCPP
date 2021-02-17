@@ -128,7 +128,7 @@ bool Settings::syncFileContents()
 				break;
 			}
 
-			if (m_prefix && key.rfind(*m_prefix, 0) == 0) {
+			if (m_prefix && key.rfind(*m_prefix, 0) != 0) {
 				// Not our business
 				line_status = LS_KEEP;
 				break;

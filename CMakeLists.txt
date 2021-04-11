@@ -13,11 +13,13 @@ endif()
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/core")
 add_subdirectory("${PROJECT_SOURCE_DIR}/modules")
+add_subdirectory("${PROJECT_SOURCE_DIR}/tests")
 
 # Source files
 set(SRC_FILES
 	${CORE_FILES}
 	${MODULES_FILES}
+	${TESTS_FILES}
 	main.cpp
 )
 

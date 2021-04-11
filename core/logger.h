@@ -16,5 +16,5 @@
 	if (!(expr)) { \
 		std::cout << "\e[0;31m" << __PRETTY_FUNCTION__ << "\e[0m: Assertion " \
 			<< #expr << ": " << msg << std::endl; \
-		throw "Assertion failed"; \
+		throw std::string("Assertion failed"); \
 	}

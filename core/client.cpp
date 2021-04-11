@@ -1,5 +1,5 @@
-#include "inc/client.h"
-#include "inc/connection.h"
+#include "client.h"
+#include "connection.h"
 
 Client::Client(cstr_t &address, int port)
 {

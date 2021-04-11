@@ -11,19 +11,19 @@ if (NOT MSVC)
 	set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 endif()
 
+add_subdirectory("${PROJECT_SOURCE_DIR}/core")
+add_subdirectory("${PROJECT_SOURCE_DIR}/modules")
+
 # Source files
 set(SRC_FILES
-	client.cpp
-	connection.cpp
-	logger.cpp
+	${CORE_FILES}
+	${MODULES_FILES}
 	main.cpp
-	settings.cpp
-	#modules/*.cpp
 )
 
 # Include Directories
 include_directories(
-	"${PROJECT_SOURCE_DIR}/inc"
+	${PROJECT_SOURCE_DIR}
 	${CURL_INCLUDE_DIRS}
 )
 

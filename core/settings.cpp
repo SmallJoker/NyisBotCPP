@@ -1,5 +1,5 @@
-#include "inc/settings.h"
-#include "inc/logger.h"
+#include "settings.h"
+#include "logger.h"
 #include <sstream>
 #include <fstream>
 

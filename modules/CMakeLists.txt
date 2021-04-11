@@ -1,0 +1,4 @@
+
+set(MODULES_FILES
+	PARENT_SCOPE
+)

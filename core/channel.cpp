@@ -1,5 +1,5 @@
-#include "inc/channel.h"
-#include "inc/logger.h"
+#include "channel.h"
+#include "logger.h"
 
 
 UserData *Channel::getUserData(const std::string &user_name)

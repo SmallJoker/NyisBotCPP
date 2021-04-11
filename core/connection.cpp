@@ -1,5 +1,5 @@
-#include "inc/connection.h"
-#include "inc/logger.h"
+#include "connection.h"
+#include "logger.h"
 #include <curl/curl.h>
 #include <sstream>
 

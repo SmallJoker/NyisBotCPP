@@ -3,6 +3,7 @@
 #include <sstream>
 #include <fstream>
 
+
 Settings::Settings(cstr_t &filename, Settings *parent, cstr_t &prefix)
 {
 	m_file = filename;
@@ -36,10 +37,11 @@ static bool is_valid_key(cstr_t &str)
 	return true;
 }
 
+#define KEY_RAW(key) (m_prefix ? *m_prefix + key : key)
 
 cstr_t &Settings::get(cstr_t &key) const
 {
-	auto it = m_settings.find(m_prefix ? *m_prefix + key : key);
+	auto it = m_settings.find(KEY_RAW(key));
 	if (it != m_settings.end())
 		return it->second;
 
@@ -59,7 +61,7 @@ void Settings::set(cstr_t &key, cstr_t &value)
 
 	MutexAutoLock _(m_lock);
 
-	std::string keyp = m_prefix ? *m_prefix + key : key;
+	std::string keyp = KEY_RAW(key);
 	m_modified.insert(keyp);
 	m_settings[keyp] = value;
 }
@@ -77,6 +79,21 @@ void Settings::set(cstr_t &key, SettingType *type)
 }
 
 
+bool Settings::remove(cstr_t &key)
+{
+	std::string keyp = KEY_RAW(key);
+	MutexAutoLock _(m_lock);
+
+	auto it = m_settings.find(keyp);
+	if (it == m_settings.end())
+		return false;
+
+	m_modified.insert(keyp);
+	m_settings.erase(it);
+	return true;
+}
+
+
 bool Settings::syncFileContents()
 {
 	MutexAutoLock _(m_lock);
@@ -91,6 +108,9 @@ bool Settings::syncFileContents()
 	std::ofstream *of = m_modified.size() ?
 		new std::ofstream(new_file) : nullptr;
 
+	// List of keys to detect removed settings
+	std::set<std::string> all_keys;
+
 	int line_n = 0;
 
 	while (is.good() && ++line_n) {
@@ -99,18 +119,19 @@ bool Settings::syncFileContents()
 
 		enum {
 			LS_KEEP,
-			LS_ERROR,
+			LS_TODO,
 			LS_HANDLED
-		} line_status = LS_ERROR;
+		} line_status = LS_TODO;
 
 		do {
+			line_status = LS_KEEP;
 			for (char c : line) {
 				if (std::isspace(c))
 					continue;
 
-				// Comment starting after optional whitespaces?
-				if (c == '#')
-					line_status = LS_KEEP;
+				// If not starting with comment: mark for parsing
+				if (c != '#')
+					line_status = LS_TODO;
 				break;
 			}
 			if (line_status == LS_KEEP)
@@ -118,7 +139,7 @@ bool Settings::syncFileContents()
 
 			size_t pos = line.find_first_of('=');
 			if (pos == std::string::npos || pos == 0 || pos + 1 == line.size()) {
-				WARN("Syntax error in line " << line_n);
+				WARN("Syntax error in line " << line_n << ": " << line);
 				break;
 			}
 
@@ -133,7 +154,8 @@ bool Settings::syncFileContents()
 				line_status = LS_KEEP;
 				break;
 			}
-				
+			all_keys.insert(key);
+
 			if (m_modified.find(key) != m_modified.end()) {
 				// Modified setting
 				m_modified.erase(key);
@@ -153,11 +175,11 @@ bool Settings::syncFileContents()
 			// Read and keep value if the prefix matches
 			std::string value = trim(line.substr(pos + 1));
 			m_settings[key] = value;
-			line_status = LS_KEEP;
+			line_status = LS_KEEP; // Use line as-is
 		} while (false);
 
 		if (line_status != LS_HANDLED && of) {
-			if (line_status == LS_ERROR)
+			if (line_status == LS_TODO)
 				*of << '#'; // Comment erroneous lines
 
 			// TODO: does "line" include \n or \r\n?
@@ -168,6 +190,18 @@ bool Settings::syncFileContents()
 	// Append new settings
 	for (cstr_t &key : m_modified)
 		*of << key << " = " << m_settings[key] << std::endl;
+
+	// Remove removed values
+	for (auto kv = m_settings.cbegin(); kv != m_settings.cend(); /*NOP*/) {
+		auto it = all_keys.find(kv->first);
+		if (it != all_keys.end()) {
+			++kv;
+			continue; // OK
+		}
+
+		// Remove missing value
+		m_settings.erase(kv++);
+	}
 
 	m_modified.clear();
 	is.close();
@@ -184,5 +218,5 @@ bool Settings::syncFileContents()
 	return true;
 }
 
-
+#undef KEY_RAW
 

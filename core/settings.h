@@ -31,8 +31,10 @@ public:
 	void set(cstr_t &key, cstr_t &value);
 	bool get(cstr_t &key, SettingType *type) const;
 	void set(cstr_t &key, SettingType *type);
+	bool remove(cstr_t &key);
 
 	bool syncFileContents();
+
 private:
 	std::mutex m_lock;
 

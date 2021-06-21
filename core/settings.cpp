@@ -182,8 +182,8 @@ bool Settings::syncFileContents()
 			if (line_status == LS_TODO)
 				*of << '#'; // Comment erroneous lines
 
-			// TODO: does "line" include \n or \r\n?
-			*of << line << std::endl;
+			if (line.size() > 0)
+				*of << line << std::endl;
 		}
 	}
 

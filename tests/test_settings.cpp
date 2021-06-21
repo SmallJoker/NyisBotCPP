@@ -50,7 +50,7 @@ std::string settings_test_data2 =
 	"key_i = 999\n"
 	"unit.baz = kittens are cute\n"
 	"random = true\n"
-	"unit.newy = whoa!";
+	"unit.newy = whoa!\n";
 
 
 void test_Settings_read()
@@ -114,12 +114,12 @@ void test_Settings_write()
 		TEST_CHECK(sw.get("baz") == sr.get("unit.baz"));
 
 		// Key removal
-		sw.remove("baz");
+		sw.remove("foobar");
 		sw.syncFileContents();
 		sr.syncFileContents();
 		SettingTypeString my_sink;
-		TEST_CHECK(!sw.get("baz", &my_sink));
-		TEST_CHECK(!sr.get("unit.baz", &my_sink));
+		TEST_CHECK(!sw.get("foobar", &my_sink));
+		TEST_CHECK(!sr.get("unit.foobar", &my_sink));
 
 		// New key
 		sw.set("newy", "whoa!");
@@ -138,9 +138,7 @@ void test_Settings_write()
 			entire.append(tmp);
 			entire.append("\n");
 		}
-		// TODO: Fix blank lines
-		LOG("\n" << trim(entire));
-		TEST_CHECK(trim(entire) == settings_test_data2);
+		TEST_CHECK(entire == settings_test_data2);
 	}
 
 	std::remove(filename.c_str());

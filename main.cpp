@@ -9,7 +9,7 @@ int main()
 	if (!test.runTests())
 		exit(EXIT_FAILURE);
 
-	//Connection con("http://example.com", 80);
+	Connection con("http://example.com", 80);
 
 	return 0;
 }

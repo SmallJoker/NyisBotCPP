@@ -77,17 +77,13 @@ bool Connection::send(const std::string &data)
 
 std::string *Connection::popRecv()
 {
-	m_recv_queue_lock.lock();
-	if (m_recv_queue.size() == 0) {
-		m_recv_queue_lock.unlock();
+	MutexLock _(m_recv_queue_lock);
+	if (m_recv_queue.size() == 0)
 		return nullptr;
-	}
 
 	// std::swap to avoid memory copy
 	std::string *data = new std::string();
 	std::swap(m_recv_queue.front(), *data);
-
-	m_recv_queue_lock.unlock();
 	return data;
 }
 
@@ -99,7 +95,7 @@ size_t Connection::recv(std::string &data)
 	size_t nread = 0;
 	CURLcode res = curl_easy_recv(m_curl, buf, sizeof(buf), &nread);
 
-	if (res != CURLE_OK)
+	if (res != CURLE_OK && res != CURLE_AGAIN)
 		WARN(curl_easy_strerror(res));
 
 	if (nread == 0)
@@ -143,10 +139,9 @@ void Connection::recvAsync(Connection *con)
 			int length = index - offset;
 
 			{
-				con->m_recv_queue_lock.lock();
+				MutexLock _(con->m_recv_queue_lock);
 				con->m_recv_queue.push(data.substr(offset, length));
 				LOG("Got line: " << con->m_recv_queue.back());
-				con->m_recv_queue_lock.unlock();
 			}
 
 			offset += length + 1; // + '\n'

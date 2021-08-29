@@ -4,6 +4,7 @@ set(CORE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/client.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/connection.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/logger.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/module.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/settings.cpp
 	PARENT_SCOPE
 )

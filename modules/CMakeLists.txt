@@ -1,4 +1,19 @@
+cmake_minimum_required(VERSION 3.9)
+set(CMAKE_CXX_STANDARD 17)
 
-set(MODULES_FILES
-	PARENT_SCOPE
+message("--- Setting up Modules")
+
+if(NOT MSVC)
+	set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
+
+	# Debugging symbols
+	#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
+endif()
+
+add_library(nbm_builtin SHARED
+	builtin.cpp
+)
+
+add_library(nbm_timebomb SHARED
+	timebomb.cpp
 )

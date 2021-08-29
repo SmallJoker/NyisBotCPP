@@ -4,7 +4,16 @@
 #include <unordered_set>
 #include <vector>
 
+#ifdef _WIN32
+	#define DLL_EXPORT __declspec(dllexport)
+#else
+	#define DLL_EXPORT [[gnu::visibility("default")]]
+#endif
+
+
 class Channel;
+class BotManager;
+struct ModuleInternal;
 
 
 class ICallbackHandler {
@@ -20,29 +29,27 @@ public:
 	virtual void onUserSay(const ChatInfo &info) {}
 };
 
-
-class Module : public ICallbackHandler {
+class IModule : public ICallbackHandler {
 public:
-	Module(const std::string &name) :
-		m_name(name)
-	{}
+	virtual ~IModule();
+	virtual void onInitialize();
 
 protected:
+	static Channel *getChannel();
+	static BotManager *getManager();
 	void log(const std::string &what, bool is_error = false);
-
-private:
-	const std::string m_name;
 };
-
 
 class BotManager : public ICallbackHandler {
 public:
-	void addModule(Module &&module);
+	~BotManager();
+
+	void addModule(IModule &&module);
 	void reloadModules();
 	void clearModules();
 	
 	Channel *getChannel(const std::string &name);
 private:
-	std::unordered_set<Module *>  m_modules;
+	std::unordered_set<ModuleInternal *> m_modules;
 	std::unordered_set<Channel *> m_channels;
 };

@@ -7,13 +7,13 @@
 #ifdef _WIN32
 	#define DLL_EXPORT __declspec(dllexport)
 #else
-	#define DLL_EXPORT [[gnu::visibility("default")]]
+	#define DLL_EXPORT
 #endif
 
 
 class Channel;
-class BotManager;
-struct ModuleInternal;
+class ModuleMgr;
+struct ModuleData;
 
 
 class ICallbackHandler {
@@ -31,25 +31,26 @@ public:
 
 class IModule : public ICallbackHandler {
 public:
-	virtual ~IModule();
-	virtual void onInitialize();
+	virtual ~IModule() {};
 
 protected:
 	static Channel *getChannel();
-	static BotManager *getManager();
-	void log(const std::string &what, bool is_error = false);
+	static ModuleMgr *getManager();
 };
 
-class BotManager : public ICallbackHandler {
+class ModuleMgr : public ICallbackHandler {
 public:
-	~BotManager();
+	   ~ModuleMgr();
 
 	void addModule(IModule &&module);
-	void reloadModules();
-	void clearModules();
-	
+	void loadModules();
+	bool reloadModule(std::string name);
+	void unloadModules();
+
 	Channel *getChannel(const std::string &name);
 private:
-	std::unordered_set<ModuleInternal *> m_modules;
+	bool loadSingleModule(const std::string &path);
+
+	std::unordered_set<ModuleData *> m_modules;
 	std::unordered_set<Channel *> m_channels;
 };

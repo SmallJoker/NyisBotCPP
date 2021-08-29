@@ -30,12 +30,6 @@ Connection::Connection(const std::string &address, int port)
 	//res = curl_easy_getinfo(m_curl, CURLINFO_ACTIVESOCKET, &m_socket);
 
 	m_thread = std::thread(recvAsync, this);
-
-	// Demo
-	std::string what("GET / HTTP/1.0\r\nHost: example.com\r\n\r\n");
-	send(what);
-
-	SLEEP_MS(1000);
 }
 
 Connection::~Connection()
@@ -117,7 +111,7 @@ void Connection::recvAsync(Connection *con)
 			SLEEP_MS(100);
 			continue;
 		}
-		LOG(">> Received " << nread << " bytes");
+		VERBOSE(">> Received " << nread << " bytes");
 
 		size_t offset = 0;
 		while (true) {
@@ -141,7 +135,7 @@ void Connection::recvAsync(Connection *con)
 			{
 				MutexLock _(con->m_recv_queue_lock);
 				con->m_recv_queue.push(data.substr(offset, length));
-				LOG("Got line: " << con->m_recv_queue.back());
+				//LOG("Got line: " << con->m_recv_queue.back());
 			}
 
 			offset += length + 1; // + '\n'

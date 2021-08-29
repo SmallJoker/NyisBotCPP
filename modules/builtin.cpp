@@ -5,19 +5,25 @@ class nbm_builtin : public IModule {
 public:
 	nbm_builtin()
 	{
-		LOG("Contructed Builtin module!");
+		LOG("Load");
 	}
 	~nbm_builtin()
 	{
-		LOG("Destructed Builtin module!");
+		LOG("Unload");
 	}
-	void onInitialize()
+
+	void onUserJoin(const std::string &name)
 	{
-		LOG("Loaded Builtin module!");
+		LOG(name);
 	}
+	virtual void onUserLeave(const std::string &name) {}
+	virtual void onUserRename(const std::string &old_name, const std::string &new_name) {}
+	virtual void onUserSay(const ChatInfo &info) {}
 };
 
-DLL_EXPORT IModule *nbm_init()
-{
-	return new nbm_builtin();
+extern "C" {
+	DLL_EXPORT void *nbm_init()
+	{
+		return new nbm_builtin();
+	}
 }

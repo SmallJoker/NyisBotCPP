@@ -4,62 +4,113 @@
 // Unix only
 #include <dlfcn.h>
 
-struct ModuleInternal {
+static const char *NAME_PREFIX = "libnbm_";
+
+struct ModuleData {
+	bool load();
+	void unload();
+
 	void *dll_handle;
 	IModule *module;
+	std::string path;
 };
 
-void log(const std::string &what, bool is_error = false)
+
+ModuleMgr::~ModuleMgr()
 {
-	WARN("stub");
+	unloadModules();
 }
 
-BotManager::~BotManager()
+void ModuleMgr::loadModules()
 {
-	clearModules();
-}
-
-void BotManager::reloadModules()
-{
-	clearModules();
+	if (m_modules.size() > 0)
+		return;
 
 	// Find modules in path, named "libnbm_?????.so"
 	for (const auto &entry : std::filesystem::directory_iterator("modules")) {
 		const std::string &name = entry.path().filename();
-		if (name.rfind("libnbm_") == std::string::npos)
+		size_t cut_a = name.rfind(NAME_PREFIX);
+		size_t cut_b = name.find('.');
+		if (cut_a == std::string::npos || cut_b == std::string::npos)
 			continue;
 		if (entry.path().extension() == "so")
 			continue;
 
-		LOG("Loading module " << entry.path().string());
-		void *handle = dlopen(entry.path().c_str(), RTLD_LAZY);
-		if (!handle) {
-			WARN("Failed to load module");
-			continue;
-		}
-
-		using InitType = IModule*(*)();
-		// "_Z8nbm_initv" for C++, or "nbm_init" for extern "C"
-		auto func = reinterpret_cast<InitType>(dlsym(handle, "_Z8nbm_initv"));
-		if (!func) {
-			WARN("Missing init function");
-			dlclose(handle);
-			continue;
-		}
-
-		ModuleInternal *mi = new ModuleInternal();
-		mi->dll_handle = handle;
-		mi->module = func();
-		m_modules.insert(mi);
+		loadSingleModule(entry.path().string());
 	}
 }
 
-void BotManager::clearModules()
+bool ModuleMgr::reloadModule(std::string name)
 {
-	for (ModuleInternal *mi : m_modules) {
-		dlclose(mi->dll_handle);
-		delete mi->module;
-		delete mi;
+	name = NAME_PREFIX + name;
+
+	for (ModuleData *md : m_modules) {
+		if (md->path.find(name) == std::string::npos)
+			continue;
+
+		md->unload();
+		bool ok = md->load();
+
+		if (!ok)
+			m_modules.erase(md);
+		return ok;
+	}
+
+	return false;
+}
+
+void ModuleMgr::unloadModules()
+{
+	LOG("Unloading modules...");
+	for (ModuleData *md : m_modules) {
+		md->unload();
+		delete md;
 	}
 	m_modules.clear();
+}
+
+bool ModuleMgr::loadSingleModule(const std::string &path)
+{
+	ModuleData *md = new ModuleData();
+	md->path = path;
+	bool ok = md->load();
+
+	if (ok)
+		m_modules.insert(md);
+	else
+		delete md;
+
+	return ok;
+}
+
+bool ModuleData::load()
+{
+	LOG("Loading module " << path);
+	void *handle = dlopen(path.c_str(), RTLD_LAZY);
+	if (!handle) {
+		ERROR("Failed to load module: " << dlerror());
+		return false;
+	}
+
+	using InitType = IModule*(*)();
+	// "_Z8nbm_initv" for C++, or "nbm_init" for extern "C"
+	auto func = reinterpret_cast<InitType>(dlsym(handle, "nbm_init"));
+	if (!func) {
+		ERROR("Missing init function");
+		dlclose(handle);
+		return false;
+	}
+
+	dll_handle = handle;
+	module = func();
+	return true;
+}
+
+void ModuleData::unload()
+{
+	delete module;
+	dlclose(dll_handle);
+
+	module = nullptr;
+	dll_handle = nullptr;
 }

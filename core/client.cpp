@@ -14,6 +14,9 @@ Client::~Client()
 bool Client::run()
 {
 	bool ok = true;
+	std::string *what = m_con->popRecv();
+	// Process incoming lines, one-by-one
+
 	return ok;
 }
 

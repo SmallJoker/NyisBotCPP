@@ -9,8 +9,11 @@ int main()
 
 	if (1) {
 		// Module tests
-		BotManager m;
-		m.reloadModules();
+		      ModuleMgr m;
+		m.loadModules();
+		bool ok = m.reloadModule("builtin");
+		LOG("Reload OK? " << (int)ok);
+		m.unloadModules();
 		exit(0);
 	}
 
@@ -19,6 +22,12 @@ int main()
 		exit(EXIT_FAILURE);
 
 	Connection con("http://example.com", 80);
+
+	// Demo
+	std::string what("GET / HTTP/1.0\r\nHost: example.com\r\n\r\n");
+	con.send(what);
+
+	//WAIT_MS(1000);
 
 	return 0;
 }

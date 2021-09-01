@@ -40,7 +40,7 @@ protected:
 
 class ModuleMgr : public ICallbackHandler {
 public:
-	   ~ModuleMgr();
+	~ModuleMgr();
 
 	void addModule(IModule &&module);
 	void loadModules();

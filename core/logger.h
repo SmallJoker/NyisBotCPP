@@ -20,3 +20,7 @@
 			<< #expr << ": " << msg << std::endl; \
 		throw std::string("Assertion failed"); \
 	}
+
+
+#define SLEEP_MS(ms) \
+	std::this_thread::sleep_for(std::chrono::milliseconds((ms)));

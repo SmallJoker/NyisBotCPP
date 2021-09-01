@@ -6,6 +6,8 @@ Unittest::Unittest()
 	// === Register tests ====
 	void test_Settings(Unittest *t);
 	test_Settings(this);
+	void test_Module(Unittest *t);
+	test_Module(this);
 }
 
 

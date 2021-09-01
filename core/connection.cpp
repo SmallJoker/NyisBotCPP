@@ -3,10 +3,6 @@
 #include <curl/curl.h>
 #include <sstream>
 
-
-#define SLEEP_MS(ms) \
-	std::this_thread::sleep_for(std::chrono::milliseconds((ms)));
-
 	
 Connection::Connection(const std::string &address, int port)
 {
@@ -78,6 +74,7 @@ std::string *Connection::popRecv()
 	// std::swap to avoid memory copy
 	std::string *data = new std::string();
 	std::swap(m_recv_queue.front(), *data);
+	m_recv_queue.pop();
 	return data;
 }
 
@@ -105,6 +102,7 @@ void Connection::recvAsync(Connection *con)
 	// Receive thread function
 	std::string data;
 
+	LOG("Start!");
 	while (con->m_is_alive) {
 		size_t nread = con->recv(data);
 		if (nread == 0) {
@@ -135,7 +133,7 @@ void Connection::recvAsync(Connection *con)
 			{
 				MutexLock _(con->m_recv_queue_lock);
 				con->m_recv_queue.push(data.substr(offset, length));
-				//LOG("Got line: " << con->m_recv_queue.back());
+				VERBOSE("len=" << length << ", text=" << con->m_recv_queue.back());
 			}
 
 			offset += length + 1; // + '\n'
@@ -150,4 +148,6 @@ void Connection::recvAsync(Connection *con)
 		}
 		SLEEP_MS(50);
 	}
+
+	LOG("Stop!");
 }

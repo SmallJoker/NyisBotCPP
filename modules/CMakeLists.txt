@@ -6,8 +6,8 @@ message("--- Setting up Modules")
 
 if(NOT MSVC)
 	set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
-	# For debugging?
-	#set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-undefined")
+	# For debugging
+	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-undefined")
 
 	# Debugging symbols
 	#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")

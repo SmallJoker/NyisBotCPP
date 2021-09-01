@@ -144,15 +144,8 @@ void test_Settings_write()
 	std::remove(filename.c_str());
 }
 
-void test_Settings_update()
-{
-	
-}
-
 void test_Settings(Unittest *ut)
 {
 	TEST_REGISTER(test_Settings_read)
 	TEST_REGISTER(test_Settings_write)
-	TEST_REGISTER(test_Settings_update)
 }
-

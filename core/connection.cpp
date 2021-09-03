@@ -129,10 +129,11 @@ void Connection::recvAsync(Connection *con)
 				offset++;
 
 			int length = index - offset;
+			bool has_cr = (data[index - 1] == '\r');
 
 			{
 				MutexLock _(con->m_recv_queue_lock);
-				con->m_recv_queue.push(data.substr(offset, length));
+				con->m_recv_queue.push(data.substr(offset, length - has_cr));
 				VERBOSE("len=" << length << ", text=" << con->m_recv_queue.back());
 			}
 

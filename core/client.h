@@ -5,6 +5,7 @@
 
 class Connection;
 struct ClientActionEntry;
+struct NetworkEvent;
 
 class Client {
 public:
@@ -15,11 +16,12 @@ public:
 	bool run();
 
 private:
-	void handleUnknown(std::string &msg);
-	void handleError(cstr_t &status, std::string &msg);
-	void handleClientEvent(cstr_t &status, std::string &msg);
-	void handleChatMessage(cstr_t &status, std::string &msg);
-	void handleServerMessage(cstr_t &status, std::string &msg);
+	void handleUnknown(cstr_t &msg);
+	void handleError(cstr_t &status, NetworkEvent *e);
+	void handleClientEvent(cstr_t &status, NetworkEvent *e);
+	void handleChatMessage(cstr_t &status, NetworkEvent *e);
+	void handlePing(cstr_t &status, NetworkEvent *e);
+	void handleServerMessage(cstr_t &status, NetworkEvent *e);
 
 	Connection *m_con = nullptr;
 	static const ClientActionEntry s_actions[];

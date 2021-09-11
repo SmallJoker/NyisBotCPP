@@ -1,6 +1,7 @@
 #include "client.h"
 #include "connection.h"
 #include "logger.h"
+#include "settings.h"
 #include <ctime>
 #include <iomanip> // std::put_time
 
@@ -14,16 +15,33 @@ struct NetworkEvent {
 	std::string nickname;
 	std::string hostmask;
 	std::string text;
+
 	std::vector<std::string> args;
+
+	void dump()
+	{
+		std::cout << "Packet dump: ";
+		for (const auto &s : args)
+			std::cout << s << " ";
+		std::cout << ": " << text << std::endl;
+	}
 };
 
-Client::Client(cstr_t &address, int port)
+Client::Client(Settings *settings)
 {
-	m_con = new Connection(address, port);
+	m_settings = settings;
+
+	const std::string &addr = settings->get("client.address");
+	SettingTypeLong port;     settings->get("client.port", &port);
+
+	m_con = new Connection(addr, port.value);
 }
 
 Client::~Client()
 {
+	send("QUIT :Goodbye");
+	SLEEP_MS(100);
+
 	delete m_con;
 }
 
@@ -59,6 +77,7 @@ bool Client::run()
 	if (!what)
 		return true;
 
+	//VERBOSE(*what);
 	NetworkEvent e;
 
 	// Extract regular text if available
@@ -66,8 +85,8 @@ bool Client::run()
 	{
 		if (text_pos == std::string::npos)
 			text_pos = what->size();
-
-		e.text = what->substr(text_pos + 1);
+		else
+			e.text = what->substr(text_pos + 1);
 	}
 
 	// Split by spaces into "e.args"
@@ -87,18 +106,14 @@ bool Client::run()
 			pos = space_pos + 1;
 		}
 	}
-	std::cout << "\t READ: ";
-	for (const auto &s : e.args)
-		std::cout << s << ", ";
-	std::cout << "; " << e.text << ";" << std::endl;
 
+	// Find matching action based on status code and index offset
 	const ClientActionEntry *action = s_actions;
 	while (true) {
-		if (e.args.size() <= action->offset)
-			continue;
-
-		if (e.args[action->offset] == action->status)
-			break; // Found match!
+		if (e.args.size() > action->offset) {
+			if (e.args[action->offset] == action->status)
+				break; // Found match!
+		}
 
 		// Try next entry
 		action++;
@@ -109,9 +124,9 @@ bool Client::run()
 		}
 	}
 
-	if (action->offset == 0) {
+	if (action->offset == 1) {
 		const std::string &arg = e.args[0];
-		// Format: nickname!hostname
+		// Format: nickname!hostname status ...
 		auto host_pos = arg.find('!');
 		if (host_pos != std::string::npos) {
 			e.nickname = arg.substr(0, host_pos);
@@ -121,10 +136,10 @@ bool Client::run()
 		}
 	}
 
+	// Run the action if there is any to run
 	if (action->handler)
 		(this->*action->handler)(action->status, &e);
 
-	SLEEP_MS(400);
 	return true;
 }
 
@@ -142,14 +157,23 @@ void Client::handleError(cstr_t &status, NetworkEvent *e)
 
 void Client::handleClientEvent(cstr_t &status, NetworkEvent *e)
 {
-	VERBOSE("Client event " << status);
+	VERBOSE("Client event: " << status);
+	e->dump();
 }
 
 void Client::handleChatMessage(cstr_t &status, NetworkEvent *e)
 {
+	// Log this line
 	std::time_t time = std::time(nullptr);
 	std::tm *tm = std::localtime(&time);
-	std::cout << std::put_time(tm, "[%T]") << e->nickname << ": " << e->text << std::endl;
+	std::cout << std::put_time(tm, "[%T]") << " ";
+	if (!e->nickname.empty() && e->nickname != m_settings->get("client.nickname"))
+		std::cout << e->nickname << ": ";
+
+	std::cout << e->text << std::endl;
+
+	if (status == "376")
+		onReady();
 }
 
 void Client::handlePing(cstr_t &status, NetworkEvent *e)
@@ -158,23 +182,78 @@ void Client::handlePing(cstr_t &status, NetworkEvent *e)
 	send("PONG " + e->text);
 }
 
+void Client::handleAuthentication(cstr_t &status, NetworkEvent *e)
+{
+	if (m_auth_sent)
+		return;
+
+	m_auth_sent = true;
+
+	const std::string &nick = m_settings->get("client.nickname");
+	LOG("Auth with nick: " << nick);
+
+	send("USER " + nick + " foo bar :Generic description");
+	send("NICK " + nick);
+}
+
 void Client::handleServerMessage(cstr_t &status, NetworkEvent *e)
 {
+	VERBOSE("Server message: " << status);
+	e->dump();
+
+	int status_i = 0;
+	sscanf(status.c_str(), "%i", &status_i);
+	if (status_i == 353) {
+		// User list
+	}
+}
+
+void Client::onReady()
+{
+	if (m_ready_called)
+		return;
+	m_ready_called = true;
+
+	auto channels = strsplit(m_settings->get("client.channels"), ' ');
+	for (const std::string &chan : channels) {
+		if (chan.size() < 2 || chan[0] != '#')
+			continue;
+		send("JOIN " + chan);
+	}
 }
 
 const ClientActionEntry Client::s_actions[] = {
 	{ 0, "ERROR", &Client::handleError },
-	{ 0, "JOIN", &Client::handleClientEvent },
+// Init messages and auth
+	{ 1, "001", &Client::handleAuthentication },
+	{ 1, "002", &Client::handleAuthentication },
+	{ 1, "003", &Client::handleAuthentication },
+	{ 1, "439", &Client::handleAuthentication },
+	{ 1, "451", &Client::handleAuthentication }, // ERR_NOTREGISTERED
+// Server information and events
+	{ 0, "PING", &Client::handlePing },
+	{ 1, "251", &Client::handleChatMessage }, // RPL_LUSERCLIENT
+	{ 1, "253", &Client::handleChatMessage }, // RPL_LUSERUNKNOWN
+	{ 1, "255", &Client::handleChatMessage }, // RPL_LUSERME
+	{ 1, "332", &Client::handleChatMessage }, // RPL_TOPIC
+	{ 1, "372", &Client::handleChatMessage }, // RPL_MOTD
+	{ 1, "375", &Client::handleChatMessage }, // RPL_MOTDSTART
+	{ 1, "376", &Client::handleChatMessage }, // RPL_ENDOFMOTD
+	{ 1, "353", &Client::handleServerMessage },  // RPL_NAMREPLY (user list)
+	{ 1, "366", &Client::handleChatMessage },  // RPL_ENDOFNAMES
+	{ 1, "396", &Client::handleServerMessage },
+// Client/user events
+	{ 1, "JOIN", &Client::handleClientEvent },
 	{ 0, "NICK", &Client::handleClientEvent },
 	{ 0, "PART", &Client::handleClientEvent },
 	{ 0, "QUIT", &Client::handleClientEvent },
+	{ 1, "MODE", nullptr }, // stub
 	{ 1, "PRIVMSG", &Client::handleChatMessage },
 	{ 1, "NOTICE",  &Client::handleChatMessage },
-	{ 0, "PING", &Client::handlePing },
-	{ 1, "332", &Client::handleServerMessage },
-	{ 1, "353", &Client::handleServerMessage },
-	{ 1, "366", &Client::handleServerMessage },
-	{ 1, "396", &Client::handleServerMessage },
+// Ignore
+	{ 1, "004", nullptr },
+	{ 1, "004", nullptr },
+	{ 1, "004", nullptr },
 	{ 1, "004", nullptr },
 	{ 1, "005", nullptr },
 	{ 1, "252", nullptr },

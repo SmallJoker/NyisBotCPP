@@ -5,6 +5,8 @@ bin/
 build/
 *.kdev4
 
+config/main.user.conf
+
 # Generated stuff
 CMakeFiles/
 Makefile

@@ -40,7 +40,11 @@ Connection::~Connection()
 
 bool Connection::send(const std::string &data)
 {
-	LOG("<< Sending " << data.size() << " bytes");
+	if (data.size() < 255)
+		LOG("<< Sending: " << data);
+	else
+		LOG("<< Sending " << data.size() << " bytes");
+
 	CURLcode res;
 	int retries = 0;
 	for (size_t sent_total = 0; sent_total < data.size();) {
@@ -134,7 +138,7 @@ void Connection::recvAsync(Connection *con)
 			{
 				MutexLock _(con->m_recv_queue_lock);
 				con->m_recv_queue.push(data.substr(offset, length - has_cr));
-				VERBOSE("len=" << length << ", text=" << con->m_recv_queue.back());
+				//VERBOSE("len=" << length << ", text=" << con->m_recv_queue.back());
 			}
 
 			offset += length + 1; // + '\n'

@@ -1,8 +1,7 @@
 #pragma once
 
-#include <string>
-#include <unordered_set>
-#include <vector>
+#include "utils.h"
+#include <set>
 
 #ifdef _WIN32
 	#define DLL_EXPORT __declspec(dllexport)
@@ -12,45 +11,42 @@
 
 
 class Channel;
+class Client;
 class ModuleMgr;
-struct ModuleData;
-
-
-class ICallbackHandler {
-public:
-	struct ChatInfo {
-		std::string nickname;
-		std::vector<std::string> parts;
-	};
-
-	virtual void onUserJoin(const std::string &name) {}
-	virtual void onUserLeave(const std::string &name) {}
-	virtual void onUserRename(const std::string &old_name, const std::string &new_name) {}
-	virtual void onUserSay(const ChatInfo &info) {}
-};
+class Network;
+struct ModuleInternal;
 
 class IModule : public ICallbackHandler {
 public:
-	virtual ~IModule() {};
+	virtual ~IModule() {}
 
 protected:
 	static Channel *getChannel();
 	static ModuleMgr *getManager();
 };
 
+
+// Main class to manage all loaded modules
+
 class ModuleMgr : public ICallbackHandler {
 public:
+	ModuleMgr(Client *cli) :
+		m_client(cli) {}
 	~ModuleMgr();
 
 	void addModule(IModule &&module);
 	void loadModules();
-	bool reloadModule(std::string name);
+	bool reloadModule(std::string name, bool keep_data = false);
 	void unloadModules();
 
-	Channel *getChannel(const std::string &name);
+	// Callback handlers
+	void onUserJoin(UserInstance *ui) {}
+	void onUserLeave(UserInstance *ui) {}
+	void onUserRename(UserInstance *ui, cstr_t &old_name) {}
+	void onUserSay(const ChatInfo &info) {}
 private:
 	bool loadSingleModule(const std::string &path);
 
-	std::unordered_set<ModuleData *> m_modules;
-	std::unordered_set<Channel *> m_channels;
+	std::set<ModuleInternal *> m_modules;
+	Client *m_client;
 };

@@ -1,12 +1,18 @@
-#include "module.h"
+
+#include "channel.h"
+#include "client.h"
 #include "logger.h"
+#include "module.h"
+#include "utils.h"
+
 #include <filesystem>
 // Unix only
 #include <dlfcn.h>
 
 static const char *NAME_PREFIX = "libnbm_";
 
-struct ModuleData {
+
+struct ModuleInternal {
 	bool load();
 	void unload();
 
@@ -14,7 +20,6 @@ struct ModuleData {
 	IModule *module;
 	std::string path;
 };
-
 
 ModuleMgr::~ModuleMgr()
 {
@@ -40,50 +45,67 @@ void ModuleMgr::loadModules()
 	}
 }
 
-bool ModuleMgr::reloadModule(std::string name)
+bool ModuleMgr::reloadModule(std::string name, bool keep_data)
 {
 	name = NAME_PREFIX + name;
 
-	for (ModuleData *md : m_modules) {
-		if (md->path.find(name) == std::string::npos)
+	ModuleInternal *mi = nullptr;
+	for (ModuleInternal *it : m_modules) {
+		if (it->path.find(name) == std::string::npos)
 			continue;
 
-		md->unload();
-		bool ok = md->load();
-
-		if (!ok)
-			m_modules.erase(md);
-		return ok;
+		mi = it;
+		break;
 	}
 
-	return false;
+	if (!mi)
+		return false;
+
+	Network *net = m_client ? m_client->getNetwork() : nullptr;
+	if (!keep_data && net) {
+		// Remove this module data from all locations
+		for (Channel *c : net->getAllChannels()) {
+			c->getContainers()->remove(mi->module);
+
+			auto &users = c->getAllUsers();
+			for (auto ui : users)
+				ui->data->remove(mi->module);
+		}
+	}
+
+	mi->unload();
+	bool ok = mi->load();
+
+	if (!ok)
+		m_modules.erase(mi);
+	return ok;
 }
 
 void ModuleMgr::unloadModules()
 {
 	LOG("Unloading modules...");
-	for (ModuleData *md : m_modules) {
-		md->unload();
-		delete md;
+	for (ModuleInternal *mi : m_modules) {
+		mi->unload();
+		delete mi;
 	}
 	m_modules.clear();
 }
 
 bool ModuleMgr::loadSingleModule(const std::string &path)
 {
-	ModuleData *md = new ModuleData();
-	md->path = path;
-	bool ok = md->load();
+	ModuleInternal *mi = new ModuleInternal();
+	mi->path = path;
+	bool ok = mi->load();
 
 	if (ok)
-		m_modules.insert(md);
+		m_modules.insert(mi);
 	else
-		delete md;
+		delete mi;
 
 	return ok;
 }
 
-bool ModuleData::load()
+bool ModuleInternal::load()
 {
 	LOG("Loading module " << path);
 	void *handle = dlopen(path.c_str(), RTLD_LAZY);
@@ -106,7 +128,7 @@ bool ModuleData::load()
 	return true;
 }
 
-void ModuleData::unload()
+void ModuleInternal::unload()
 {
 	delete module;
 	dlclose(dll_handle);

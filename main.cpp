@@ -17,9 +17,9 @@ int main()
 {
 	LOG("Startup");
 
-	//Unittest test;
-	//if (!test.runTests())
-	//	exit(EXIT_FAILURE);
+	Unittest test;
+	if (!test.runTests() || true)
+		exit(EXIT_FAILURE);
 
 	if (0) {
 		Connection con("http://example.com", 80);

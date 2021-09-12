@@ -1,8 +1,13 @@
+// Class for the protocol implementation
+
 #include "client.h"
 #include "connection.h"
+#include "channel.h"
 #include "logger.h"
+#include "module.h"
 #include "settings.h"
 #include <ctime>
+#include <cstring>
 #include <iomanip> // std::put_time
 
 struct ClientActionEntry {
@@ -31,6 +36,9 @@ Client::Client(Settings *settings)
 {
 	m_settings = settings;
 
+	m_network = new Network(this);
+	m_module_mgr = new ModuleMgr(this);
+
 	const std::string &addr = settings->get("client.address");
 	SettingTypeLong port;     settings->get("client.port", &port);
 
@@ -42,7 +50,14 @@ Client::~Client()
 	send("QUIT :Goodbye");
 	SLEEP_MS(100);
 
+	delete m_module_mgr;
+	m_module_mgr = nullptr;
+
+	delete m_network;
+	m_network = nullptr;
+
 	delete m_con;
+	m_con = nullptr;
 }
 
 
@@ -159,6 +174,30 @@ void Client::handleClientEvent(cstr_t &status, NetworkEvent *e)
 {
 	VERBOSE("Client event: " << status);
 	e->dump();
+
+	if (status == "JOIN") {
+		cstr_t channel = e->text.substr(e->text[0] == ':');
+		Channel *c = m_network->getOrCreateChannel(channel);
+
+		UserInstance *ui = c->addUser(e->nickname);
+		ui->hostmask = e->hostmask;
+
+		m_module_mgr->onUserJoin(ui);
+	}
+	if (status == "PART") {
+		cstr_t &channel = e->args[2];
+		Channel *c = m_network->getOrCreateChannel(channel);
+
+		UserInstance *ui = c->getUser(e->nickname);
+		if (!ui) {
+			ERROR("Unknown user: " << e->nickname);
+			return;
+		}
+
+		m_module_mgr->onUserLeave(ui);
+		c->removeUser(ui);
+		return;
+	}
 }
 
 void Client::handleChatMessage(cstr_t &status, NetworkEvent *e)
@@ -205,6 +244,19 @@ void Client::handleServerMessage(cstr_t &status, NetworkEvent *e)
 	sscanf(status.c_str(), "%i", &status_i);
 	if (status_i == 353) {
 		// User list
+		cstr_t &channel = e->args[4];
+		std::vector<std::string> users = strsplit(e->text, ' ');
+
+		Channel *c = m_network->getOrCreateChannel(channel);
+		for (auto &name : users) {
+			// Trim first character if necessary
+			if (strchr("~&@%+", name[0]))
+				name = name.substr(1);
+
+			UserInstance *ui = c->addUser(name);
+			m_module_mgr->onUserJoin(ui);
+		}
+		return;
 	}
 }
 

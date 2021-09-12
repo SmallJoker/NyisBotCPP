@@ -1,3 +1,4 @@
+#include "../core/channel.h"
 #include "../core/module.h"
 #include "../core/logger.h"
 
@@ -12,12 +13,12 @@ public:
 		LOG("Unload");
 	}
 
-	void onUserJoin(const std::string &name)
+	void onUserJoin(UserInstance *ui)
 	{
-		LOG(name);
+		LOG(ui->nickname);
 	}
-	virtual void onUserLeave(const std::string &name) {}
-	virtual void onUserRename(const std::string &old_name, const std::string &new_name) {}
+	virtual void onUserLeave(UserInstance *ui) {}
+	virtual void onUserRename(UserInstance *ui, cstr_t &new_name) {}
 	virtual void onUserSay(const ChatInfo &info) {}
 };
 

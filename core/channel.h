@@ -38,6 +38,16 @@ public:
 	std::string hostmask;
 	Containers *data;
 
+	// Valid for ACC and STATUS
+	enum UserAccStatus {
+		UAS_UNKNOWN = -1,
+		UAS_NONE = 0,
+		UAS_EXISTS = 1,
+		UAS_RECOGNIZED = 2,
+		UAS_LOGGED_IN = 3
+	};
+	UserAccStatus account = UAS_UNKNOWN;
+
 private:
 	int m_references;
 };
@@ -96,8 +106,9 @@ public:
 	void setActiveChannel(cstr_t &name)
 	{ m_last_active_channel = name; }
 
-	Channel *getOrCreateChannel(cstr_t &name);
-	Channel *getChannel();
+	Channel *addChannel(cstr_t &name);
+	Channel *getChannel(cstr_t &name) const;
+	Channel *getChannel() const;
 	bool removeChannel(Channel *c);
 
 	std::set<Channel *> &getAllChannels()
@@ -107,5 +118,4 @@ private:
 	std::string m_last_active_channel;
 
 	std::set<Channel *> m_channels;
-	std::set<UserInstance *> m_users;
 };

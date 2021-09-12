@@ -13,13 +13,21 @@ public:
 		LOG("Unload");
 	}
 
-	void onUserJoin(UserInstance *ui)
+	void onUserJoin(Channel *c, UserInstance *ui)
 	{
 		LOG(ui->nickname);
 	}
-	virtual void onUserLeave(UserInstance *ui) {}
-	virtual void onUserRename(UserInstance *ui, cstr_t &new_name) {}
-	virtual void onUserSay(const ChatInfo &info) {}
+	virtual void onUserLeave(Channel *c, UserInstance *ui) {}
+	virtual void onUserRename(Channel *c, UserInstance *ui, cstr_t &new_name) {}
+
+	bool onUserSay(Channel *c, const ChatInfo &info)
+	{
+		if (info.ui) {
+			c->say("Hello " + info.ui->nickname + "!");
+			return true;
+		}
+		return false;
+	}
 };
 
 extern "C" {

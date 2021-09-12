@@ -25,7 +25,7 @@ struct NetworkEvent {
 
 	void dump()
 	{
-		std::cout << "Packet dump: ";
+		std::cout << "\tPacket dump: ";
 		for (const auto &s : args)
 			std::cout << s << " ";
 		std::cout << ": " << text << std::endl;
@@ -42,7 +42,7 @@ Client::Client(Settings *settings)
 
 Client::~Client()
 {
-	if (m_con) {
+	if (m_auth_status != AS_SEND_NICK) {
 		send("QUIT :Goodbye");
 		SLEEP_MS(100);
 	}
@@ -59,6 +59,10 @@ Client::~Client()
 
 void Client::initialize()
 {
+	m_nickname = m_settings->get("client.nickname");
+	SettingTypeLong at; m_settings->get("client.authtype", &at);
+	m_auth_type = at.value;
+
 	const std::string &addr = m_settings->get("client.address");
 	SettingTypeLong port;     m_settings->get("client.port", &port);
 
@@ -68,20 +72,6 @@ void Client::initialize()
 void Client::send(cstr_t &text)
 {
 	m_con->send(text + '\n');
-}
-
-static std::string get_next_part(std::string &input)
-{
-	auto pos = input.find(' ');
-	std::string value;
-	if (pos == std::string::npos) {
-		std::swap(value, input);
-		return value;
-	}
-
-	value = input.substr(0, pos);
-	input = input.substr(pos + 1);
-	return value;
 }
 
 bool Client::run()
@@ -159,6 +149,10 @@ bool Client::run()
 	if (action->handler)
 		(this->*action->handler)(action->status, &e);
 
+	// TODO: This is a bad location
+	if (m_auth_status == AS_JOIN_CHANNELS)
+		joinChannels();
+
 	return true;
 }
 
@@ -181,16 +175,41 @@ void Client::handleClientEvent(cstr_t &status, NetworkEvent *e)
 
 	if (status == "JOIN") {
 		cstr_t channel = e->text.substr(e->text[0] == ':');
-		Channel *c = m_network->getOrCreateChannel(channel);
+		Channel *c = m_network->getChannel(channel);
+		if (!c) {
+			c = m_network->addChannel(channel);
+			c->addUser(m_nickname);
+		}
 
 		UserInstance *ui = c->addUser(e->nickname);
 		ui->hostmask = e->hostmask;
 
-		m_module_mgr->onUserJoin(ui);
+		m_module_mgr->onUserJoin(c, ui);
 	}
-	if (status == "PART") {
+	if (status == "MODE") {
+		cstr_t &what = e->args[2];
+		cstr_t &modes = e->text;
+
+		if (what[0] == '#') {
+			// Channel mode
+			return;
+		}
+
+		if (what == m_nickname) {
+			// Our mode updated. Auth, if not already done.
+			if (m_auth_status == AS_AUTHENTICATE) {
+				if (m_auth_type > 0)
+					send("PRIVMSG NickServ :identify " + m_settings->get("client.password"));
+			}
+
+			if (strchr(modes.c_str(), 'r'))
+				m_auth_status = AS_JOIN_CHANNELS;
+		}
+		return;
+	}
+	if (status == "PART" || status == "KICK") {
 		cstr_t &channel = e->args[2];
-		Channel *c = m_network->getOrCreateChannel(channel);
+		Channel *c = m_network->addChannel(channel);
 
 		UserInstance *ui = c->getUser(e->nickname);
 		if (!ui) {
@@ -198,8 +217,41 @@ void Client::handleClientEvent(cstr_t &status, NetworkEvent *e)
 			return;
 		}
 
-		m_module_mgr->onUserLeave(ui);
+		if (e->nickname == m_nickname) {
+			m_module_mgr->onChannelLeave(c);
+			m_network->removeChannel(c);
+			return;
+		}
+
+		m_module_mgr->onUserLeave(c, ui);
 		c->removeUser(ui);
+		return;
+	}
+	if (status == "QUIT") {
+		if (e->nickname == m_nickname) {
+			for (Channel *c : m_network->getAllChannels()) {
+				m_module_mgr->onChannelLeave(c);
+			}
+			//delete this; // eeh.. maybe?
+			delete m_network;
+			m_network = nullptr;
+			return;
+		}
+
+		// Remove the user from all channels
+		UserInstance *ui = m_network->getUser(e->nickname);
+		for (Channel *c : m_network->getAllChannels()) {
+			if (c->removeUser(ui)) {
+				m_module_mgr->onUserLeave(c, ui);
+			}
+		}
+		// .. and from the entire network to drop the instance
+		m_network->removeUser(ui);
+		ui = nullptr;
+		return;
+	}
+	if (status == "INVITE") {
+		send("JOIN " + e->text);
 		return;
 	}
 }
@@ -210,13 +262,51 @@ void Client::handleChatMessage(cstr_t &status, NetworkEvent *e)
 	std::time_t time = std::time(nullptr);
 	std::tm *tm = std::localtime(&time);
 	std::cout << std::put_time(tm, "[%T]") << " ";
-	if (!e->nickname.empty() && e->nickname != m_settings->get("client.nickname"))
-		std::cout << e->nickname << ": ";
+	if (!e->nickname.empty() && e->nickname != m_nickname)
+		std::cout << e->nickname << " \t";
 
 	std::cout << e->text << std::endl;
 
-	if (status == "376")
-		onReady();
+	if (status == "PRIVMSG") {
+		// nick!host PRIVMSG where :text text
+		if (e->nickname == "NickServ") {
+			// Retrieve pending user status requests
+
+			auto args = strsplit(e->text);
+			if (m_auth_type == 1) {
+				if (args[1] == "ACC") {
+					// For IRCd: solanum
+					int status = args[2][0] - '0';
+					cstr_t &nick = args[0];
+				}
+			} else if (m_auth_type == 2) {
+				if (args[0] == "STATUS") {
+					// For IRCd: plexus
+					int status = args[2][0] - '0';
+					cstr_t &nick = args[1];
+				}
+			}
+			return;
+		}
+
+		cstr_t &channel = e->args[2];
+		if (channel[0] != '#') {
+			WARN("Private message handling is yet not implemented.");
+			return;
+		}
+
+		Channel *c = m_network->getChannel(channel);
+		if (!c) {
+			ERROR("Channel " << channel << "does not exist");
+			c = m_network->addChannel(channel);
+		}
+
+		ICallbackHandler::ChatInfo info;
+		info.ui = m_network->getUser(e->nickname);
+		info.parts = strsplit(e->text);
+		m_module_mgr->onUserSay(c, info);
+		return;
+	}
 }
 
 void Client::handlePing(cstr_t &status, NetworkEvent *e)
@@ -227,16 +317,24 @@ void Client::handlePing(cstr_t &status, NetworkEvent *e)
 
 void Client::handleAuthentication(cstr_t &status, NetworkEvent *e)
 {
-	if (m_auth_sent)
+	if (m_auth_status == AS_SEND_NICK) {
+		LOG("Auth with nick: " << m_nickname);
+
+		send("USER " + m_nickname + " foo bar :Generic description");
+		send("NICK " + m_nickname);
+
+		SettingTypeLong at; m_settings->get("client.authtype", &at);
+		if (at.value > 0)
+			m_auth_status = AS_AUTHENTICATE;
+		else
+			m_auth_status = AS_JOIN_CHANNELS;
 		return;
-
-	m_auth_sent = true;
-
-	const std::string &nick = m_settings->get("client.nickname");
-	LOG("Auth with nick: " << nick);
-
-	send("USER " + nick + " foo bar :Generic description");
-	send("NICK " + nick);
+	}
+	if (status == "396") {
+		// Hostmask changed. This indicates successful authentication
+		m_auth_status = AS_JOIN_CHANNELS;
+		return;
+	}
 }
 
 void Client::handleServerMessage(cstr_t &status, NetworkEvent *e)
@@ -249,31 +347,32 @@ void Client::handleServerMessage(cstr_t &status, NetworkEvent *e)
 	if (status_i == 353) {
 		// User list
 		cstr_t &channel = e->args[4];
-		std::vector<std::string> users = strsplit(e->text, ' ');
+		std::vector<std::string> users = strsplit(e->text);
 
-		Channel *c = m_network->getOrCreateChannel(channel);
+		Channel *c = m_network->addChannel(channel);
 		for (auto &name : users) {
 			// Trim first character if necessary
 			if (strchr("~&@%+", name[0]))
 				name = name.substr(1);
 
 			UserInstance *ui = c->addUser(name);
-			m_module_mgr->onUserJoin(ui);
+			m_module_mgr->onUserJoin(c, ui);
 		}
 		return;
 	}
 }
 
-void Client::onReady()
+void Client::joinChannels()
 {
-	if (m_ready_called)
+	if (m_auth_status != AS_JOIN_CHANNELS)
 		return;
-	m_ready_called = true;
+	m_auth_status = AS_DONE;
 
-	auto channels = strsplit(m_settings->get("client.channels"), ' ');
+	auto channels = strsplit(m_settings->get("client.channels"));
 	for (const std::string &chan : channels) {
 		if (chan.size() < 2 || chan[0] != '#')
 			continue;
+
 		send("JOIN " + chan);
 	}
 }
@@ -284,6 +383,7 @@ const ClientActionEntry Client::s_actions[] = {
 	{ 1, "001", &Client::handleAuthentication },
 	{ 1, "002", &Client::handleAuthentication },
 	{ 1, "003", &Client::handleAuthentication },
+	{ 1, "396", &Client::handleAuthentication }, // Hostmask changed
 	{ 1, "439", &Client::handleAuthentication },
 	{ 1, "451", &Client::handleAuthentication }, // ERR_NOTREGISTERED
 // Server information and events
@@ -297,19 +397,16 @@ const ClientActionEntry Client::s_actions[] = {
 	{ 1, "376", &Client::handleChatMessage }, // RPL_ENDOFMOTD
 	{ 1, "353", &Client::handleServerMessage },  // RPL_NAMREPLY (user list)
 	{ 1, "366", &Client::handleChatMessage },  // RPL_ENDOFNAMES
-	{ 1, "396", &Client::handleServerMessage },
 // Client/user events
 	{ 1, "JOIN", &Client::handleClientEvent },
 	{ 0, "NICK", &Client::handleClientEvent },
 	{ 0, "PART", &Client::handleClientEvent },
 	{ 0, "QUIT", &Client::handleClientEvent },
-	{ 1, "MODE", nullptr }, // stub
+	{ 1, "MODE",  &Client::handleClientEvent },
 	{ 1, "PRIVMSG", &Client::handleChatMessage },
 	{ 1, "NOTICE",  &Client::handleChatMessage },
+	{ 1, "INVITE", &Client::handleClientEvent },
 // Ignore
-	{ 1, "004", nullptr },
-	{ 1, "004", nullptr },
-	{ 1, "004", nullptr },
 	{ 1, "004", nullptr },
 	{ 1, "005", nullptr },
 	{ 1, "252", nullptr },

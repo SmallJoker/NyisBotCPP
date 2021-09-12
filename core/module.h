@@ -20,9 +20,11 @@ class IModule : public ICallbackHandler {
 public:
 	virtual ~IModule() {}
 
+	void setClient(Client *cli)
+	{ m_client = cli; }
+
 protected:
-	static Channel *getChannel();
-	static ModuleMgr *getManager();
+	Client *m_client;
 };
 
 
@@ -40,10 +42,10 @@ public:
 	void unloadModules();
 
 	// Callback handlers
-	void onUserJoin(UserInstance *ui) {}
-	void onUserLeave(UserInstance *ui) {}
-	void onUserRename(UserInstance *ui, cstr_t &old_name) {}
-	void onUserSay(const ChatInfo &info) {}
+	void onUserJoin(Channel *c, UserInstance *ui) {}
+	void onUserLeave(Channel *c, UserInstance *ui) {}
+	void onUserRename(Channel *c, UserInstance *ui, cstr_t &old_name) {}
+	bool onUserSay(Channel *c, const ChatInfo &info);
 private:
 	bool loadSingleModule(const std::string &path);
 

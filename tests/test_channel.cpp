@@ -30,9 +30,9 @@ void test_Network_Channel_UserInstance()
 {
 	Network &n = *client->getNetwork();
 
-	Channel *c = n.getOrCreateChannel("#foobar");
+	Channel *c = n.addChannel("#foobar");
 	TEST_CHECK(c != nullptr && c->getName() == "#foobar");
-	TEST_CHECK(n.getOrCreateChannel("#foobar") == c);
+	TEST_CHECK(n.addChannel("#foobar") == c);
 
 	instances = 0;
 	{
@@ -45,8 +45,10 @@ void test_Network_Channel_UserInstance()
 		ui_m->data->add(nullptr, new RefContainer());
 
 		TEST_CHECK(c->removeUser(ui_m) == true);
+		// Reference is still held by Network
 		TEST_CHECK(instances == 2);
 		TEST_CHECK(c->getUser("Mickey") == nullptr);
+		// Drop from Network -> reference gone
 		TEST_CHECK(n.removeUser(ui_m) == true);
 		TEST_CHECK(instances == 1);
 	}

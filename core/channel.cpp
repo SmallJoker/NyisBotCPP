@@ -109,7 +109,7 @@ Network::~Network()
 	m_channels.clear();
 }
 
-Channel *Network::getOrCreateChannel(cstr_t &name)
+Channel *Network::addChannel(cstr_t &name)
 {
 	for (Channel *it : m_channels) {
 		if (it->getName() == name)
@@ -121,7 +121,16 @@ Channel *Network::getOrCreateChannel(cstr_t &name)
 	return c;
 }
 
-Channel *Network::getChannel()
+Channel *Network::getChannel(cstr_t &name) const
+{
+	for (Channel *it : m_channels) {
+		if (it->getName() == name)
+			return it;
+	}
+	return nullptr;
+}
+
+Channel *Network::getChannel() const
 {
 	for (Channel *it : m_channels) {
 		if (it->getName() == m_last_active_channel)

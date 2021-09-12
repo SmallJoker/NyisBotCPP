@@ -10,21 +10,27 @@ typedef const std::string cstr_t;
 
 
 std::string trim(cstr_t &str);
-std::vector<std::string> strsplit(cstr_t &input, char delim);
+std::vector<std::string> strsplit(cstr_t &input, char delim = ' ');
+std::string get_next_part(std::string &input);
 
 class UserInstance;
+class Channel;
 
 class ICallbackHandler {
 public:
+	virtual ~ICallbackHandler() {}
+
 	struct ChatInfo {
 		UserInstance *ui;
 		std::vector<std::string> parts;
 	};
 
-	virtual void onUserJoin(UserInstance *ui) {}
-	virtual void onUserLeave(UserInstance *ui) {}
-	virtual void onUserRename(UserInstance *ui, cstr_t &old_name) {}
-	virtual void onUserSay(const ChatInfo &info) {}
+	virtual void onChannelJoin(Channel *c) {}
+	virtual void onChannelLeave(Channel *c) {}
+	virtual void onUserJoin(Channel *c, UserInstance *ui) {}
+	virtual void onUserLeave(Channel *c, UserInstance *ui) {}
+	virtual void onUserRename(Channel *c, UserInstance *ui, cstr_t &old_name) {}
+	virtual bool onUserSay(Channel *c, const ChatInfo &info) { return false; }
 };
 
 

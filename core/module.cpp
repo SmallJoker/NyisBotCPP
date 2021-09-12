@@ -41,7 +41,8 @@ void ModuleMgr::loadModules()
 		if (entry.path().extension() == "so")
 			continue;
 
-		loadSingleModule(entry.path().string());
+		if (!loadSingleModule(entry.path().string()))
+			exit(1);
 	}
 }
 
@@ -65,7 +66,9 @@ bool ModuleMgr::reloadModule(std::string name, bool keep_data)
 	mi->unload();
 	bool ok = mi->load();
 
-	if (!ok) {
+	if (ok) {
+		mi->module->setClient(m_client);
+	} else {
 		keep_data = false;
 		m_modules.erase(mi);
 	}
@@ -115,18 +118,29 @@ bool ModuleMgr::loadSingleModule(const std::string &path)
 	mi->path = path;
 	bool ok = mi->load();
 
-	if (ok)
+	if (ok) {
 		m_modules.insert(mi);
-	else
+		mi->module->setClient(m_client);
+	} else {
 		delete mi;
+	}
 
 	return ok;
+}
+
+bool ModuleMgr::onUserSay(Channel *c, const ChatInfo &info)
+{
+	for (ModuleInternal *mi : m_modules) {
+		if (mi->module->onUserSay(c, info))
+			return true;
+	}
+	return false;
 }
 
 bool ModuleInternal::load()
 {
 	LOG("Loading module " << path);
-	void *handle = dlopen(path.c_str(), RTLD_LAZY);
+	void *handle = dlopen(path.c_str(), RTLD_NOW);
 	if (!handle) {
 		ERROR("Failed to load module: " << dlerror());
 		return false;

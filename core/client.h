@@ -36,7 +36,7 @@ private:
 	void handleAuthentication(cstr_t &status, NetworkEvent *e);
 	void handleServerMessage(cstr_t &status, NetworkEvent *e);
 
-	void onReady();
+	void joinChannels();
 
 	Connection *m_con = nullptr;
 	ModuleMgr *m_module_mgr = nullptr;
@@ -44,6 +44,27 @@ private:
 	Settings *m_settings = nullptr;
 	static const ClientActionEntry s_actions[];
 
-	bool m_auth_sent = false;
-	bool m_ready_called = false;
+	enum AuthStatus {
+		AS_SEND_NICK,
+		AS_AUTHENTICATE,
+		AS_JOIN_CHANNELS,
+		AS_DONE
+	};
+	AuthStatus m_auth_status = AS_SEND_NICK;
+
+	// Cached settings
+	std::string m_nickname;
+	long m_auth_type;
+};
+
+
+struct ChannelUserContainer : public IContainer {
+	enum ChannelPermissions {
+		CP_NONE,
+		CP_CASUAL,
+		CP_IDENTIFIED,
+		CP_ADMIN
+	};
+	std::string modes;
+	ChannelPermissions perm;
 };

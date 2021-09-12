@@ -34,6 +34,20 @@ std::vector<std::string> strsplit(cstr_t &input, char delim)
 	return parts;
 }
 
+std::string get_next_part(std::string &input)
+{
+	auto pos = input.find(' ');
+	std::string value;
+	if (pos == std::string::npos) {
+		std::swap(value, input);
+		return value;
+	}
+
+	value = input.substr(0, pos);
+	input = input.substr(pos + 1);
+	return value;
+}
+
 
 Containers::~Containers()
 {

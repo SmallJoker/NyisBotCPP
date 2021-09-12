@@ -113,7 +113,7 @@ void Connection::recvAsync(Connection *con)
 			SLEEP_MS(100);
 			continue;
 		}
-		VERBOSE(">> Received " << nread << " bytes");
+		//VERBOSE(">> Received " << nread << " bytes");
 
 		size_t offset = 0;
 		while (true) {

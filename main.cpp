@@ -1,6 +1,7 @@
 #include "core/logger.h"
 #include "core/client.h"
 #include "core/connection.h"
+#include "core/module.h"
 #include "core/settings.h"
 #include "tests/test.h"
 
@@ -17,9 +18,11 @@ int main()
 {
 	LOG("Startup");
 
-	Unittest test;
-	if (!test.runTests() || true)
-		exit(EXIT_FAILURE);
+	if (0) {
+		Unittest test;
+		if (!test.runTests())
+			exit(EXIT_FAILURE);
+	}
 
 	if (0) {
 		Connection con("http://example.com", 80);
@@ -40,6 +43,7 @@ int main()
 	atexit(exit_main);
 
 	s_cli = new Client(&settings_rw);
+	s_cli->getModuleMgr()->loadModules();
 	s_cli->initialize();
 	s_cli->send("PING server");
 

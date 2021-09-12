@@ -9,7 +9,10 @@ find_package(CURL REQUIRED)
 find_package(Threads REQUIRED) # pthread
 
 if (NOT MSVC)
-	set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
+	# -O3 is default
+	#set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
+
+	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-undefined")
 
 	# Debugging symbols
 	#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
@@ -17,7 +20,6 @@ endif()
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/core")
 add_subdirectory("${PROJECT_SOURCE_DIR}/tests")
-add_subdirectory("${PROJECT_SOURCE_DIR}/modules")
 
 # Source files
 set(SRC_FILES
@@ -32,11 +34,24 @@ include_directories(
 	${CURL_INCLUDE_DIRS}
 )
 
-add_executable(${PROJECT_NAME} ${SRC_FILES})
+add_library(${PROJECT_NAME} SHARED ${SRC_FILES})
 
 target_link_libraries(
 	${PROJECT_NAME}
-	${CURL_LIBRARIES}
-	${CMAKE_DL_LIBS}
-	Threads::Threads
+	PRIVATE ${CURL_LIBRARIES}
+	PRIVATE ${CMAKE_DL_LIBS}
+	PRIVATE Threads::Threads
+)
+
+
+# ---------------- Loader ----------------
+
+project(loader)
+
+add_subdirectory("${PROJECT_SOURCE_DIR}/modules")
+
+add_executable(${PROJECT_NAME} "loader.cpp")
+target_link_libraries(
+	${PROJECT_NAME}
+	PRIVATE ${CMAKE_DL_LIBS}
 )

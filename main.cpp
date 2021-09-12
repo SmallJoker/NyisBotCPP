@@ -14,7 +14,9 @@ void exit_main()
 	SLEEP_MS(100);
 }
 
-int main()
+extern "C" {
+
+DLL_EXPORT int main()
 {
 	LOG("Startup");
 
@@ -44,6 +46,7 @@ int main()
 
 	s_cli = new Client(&settings_rw);
 	s_cli->getModuleMgr()->loadModules();
+	exit(1);
 	s_cli->initialize();
 	s_cli->send("PING server");
 
@@ -56,4 +59,4 @@ int main()
 	return 0;
 }
 
-
+}

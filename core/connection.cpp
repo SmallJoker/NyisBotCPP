@@ -25,13 +25,16 @@ Connection::Connection(const std::string &address, int port)
 	ASSERT(res == CURLE_OK, "curl failed: " << curl_easy_strerror(res));
 	//res = curl_easy_getinfo(m_curl, CURLINFO_ACTIVESOCKET, &m_socket);
 
-	m_thread = std::thread(recvAsync, this);
+	m_thread = new std::thread(recvAsync, this);
 }
 
 Connection::~Connection()
 {
 	m_is_alive = false;
-	m_thread.join();
+
+	m_thread->join();
+	delete m_thread;
+	m_thread = nullptr;
 
 	// Disconnect
 	curl_easy_cleanup(m_curl);

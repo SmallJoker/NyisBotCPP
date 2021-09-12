@@ -46,7 +46,7 @@ DLL_EXPORT int main()
 
 	s_cli = new Client(&settings_rw);
 	s_cli->getModuleMgr()->loadModules();
-	exit(1);
+	//exit(1);
 	s_cli->initialize();
 	s_cli->send("PING server");
 

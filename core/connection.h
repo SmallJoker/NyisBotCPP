@@ -23,7 +23,7 @@ private:
 	size_t recv(std::string &data);
 	static void recvAsync(Connection *con);
 
-	std::thread m_thread;
+	std::thread *m_thread;
 	std::queue<std::string> m_recv_queue;
 	std::mutex m_recv_queue_lock;
 	void *m_curl;

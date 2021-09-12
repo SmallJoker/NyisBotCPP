@@ -15,7 +15,6 @@ endif()
 
 add_library(nbm_builtin SHARED
 	builtin.cpp
-	#"${CMAKE_CURRENT_BINARY_DIR}/../NyisBotCPP"
 )
 target_link_libraries(nbm_builtin
 	PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/../libNyisBotCPP.so"

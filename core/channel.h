@@ -3,28 +3,67 @@
 #include "utils.h"
 #include <set>
 
+#include <iostream>
+
 class Client;
 class Channel;
 
-struct UserInstance {
+class UserInstance {
+public:
 	UserInstance(cstr_t &name)
 	{
 		nickname = name;
 		data = new Containers();
+		m_references = 0;
 	}
 	~UserInstance()
 	{
+		//std::cout << "Deleted " << nickname << std::endl;
 		delete data;
+		data = nullptr;
 	}
+	void grab()
+	{
+		m_references++;
+	}
+	void drop()
+	{
+		m_references--;
+		if (m_references <= 0)
+			delete this;
+	}
+	int getRefs() const { return m_references; }
 
 	std::string nickname;
 	std::string hostmask;
 	Containers *data;
+
+private:
+	int m_references;
 };
 
-class Channel {
+class IUserOwner {
 public:
-	Channel(cstr_t &name);
+	IUserOwner(Client *cli);
+	virtual ~IUserOwner();
+
+	UserInstance *addUser(cstr_t &name);
+	UserInstance *getUser(cstr_t &name) const;
+	bool removeUser(UserInstance *ui);
+
+	std::set<UserInstance *> &getAllUsers()
+	{ return m_users; }
+
+protected:
+	Client *m_client = nullptr;
+
+	// Per-user data
+	std::set<UserInstance *> m_users;
+};
+
+class Channel : public IUserOwner {
+public:
+	Channel(cstr_t &name, Client *cli);
 	~Channel();
 
 	cstr_t &getName() const
@@ -39,36 +78,27 @@ public:
 	Containers *getContainers()
 	{ return m_containers; }
 
-	UserInstance *addUser(cstr_t &name);
-	UserInstance *getUser(cstr_t &name) const;
-	bool removeUser(UserInstance *ui);
-
-	std::set<UserInstance *> &getAllUsers()
-	{ return m_users; }
-
-	void say(cstr_t &what);
-	void quit();
+	void say(cstr_t &text);
+	void leave();
 private:
 	std::string m_name;
 
-	// Per-user data
-	std::set<UserInstance *> m_users;
 	// Per-channel data
-	Containers *m_containers;
+	Containers *m_containers = nullptr;
 };
 
 
-
-class Network : public ICallbackHandler {
+class Network : public ICallbackHandler, public IUserOwner {
 public:
-	Network(Client *cli) :
-		m_client(cli) {}
+	Network(Client *cli) : IUserOwner(cli) {}
+	~Network();
 
 	void setActiveChannel(cstr_t &name)
 	{ m_last_active_channel = name; }
 
-	Channel *getChannel();
 	Channel *getOrCreateChannel(cstr_t &name);
+	Channel *getChannel();
+	bool removeChannel(Channel *c);
 
 	std::set<Channel *> &getAllChannels()
 	{ return m_channels; }
@@ -76,7 +106,6 @@ public:
 private:
 	std::string m_last_active_channel;
 
-	Client *m_client;
 	std::set<Channel *> m_channels;
 	std::set<UserInstance *> m_users;
 };

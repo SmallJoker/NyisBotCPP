@@ -38,17 +38,14 @@ Client::Client(Settings *settings)
 
 	m_network = new Network(this);
 	m_module_mgr = new ModuleMgr(this);
-
-	const std::string &addr = settings->get("client.address");
-	SettingTypeLong port;     settings->get("client.port", &port);
-
-	m_con = new Connection(addr, port.value);
 }
 
 Client::~Client()
 {
-	send("QUIT :Goodbye");
-	SLEEP_MS(100);
+	if (m_con) {
+		send("QUIT :Goodbye");
+		SLEEP_MS(100);
+	}
 
 	delete m_module_mgr;
 	m_module_mgr = nullptr;
@@ -60,6 +57,13 @@ Client::~Client()
 	m_con = nullptr;
 }
 
+void Client::initialize()
+{
+	const std::string &addr = m_settings->get("client.address");
+	SettingTypeLong port;     m_settings->get("client.port", &port);
+
+	m_con = new Connection(addr, port.value);
+}
 
 void Client::send(cstr_t &text)
 {

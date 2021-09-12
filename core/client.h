@@ -15,6 +15,8 @@ public:
 	Client(Settings *settings);
 	~Client();
 
+	void initialize();
+
 	Settings *getSettings() const
 	{ return m_settings; }
 	ModuleMgr *getModuleMgr() const

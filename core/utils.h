@@ -40,6 +40,7 @@ public:
 	bool add(const void *owner, IContainer *data);
 	IContainer *get(const void *owner) const;
 	bool remove(const void *owner);
+	bool move(const void *old_owner, const void *new_owner);
 
 protected:
 	std::map<const void *, IContainer *> m_data;

@@ -4,10 +4,13 @@
 Unittest::Unittest()
 {
 	// === Register tests ====
-	void test_Settings(Unittest *t);
-	test_Settings(this);
 	void test_Module(Unittest *t);
 	test_Module(this);
+	void test_Settings(Unittest *t);
+	test_Settings(this);
+	// Channel depends on Containers (Module)
+	void test_Channel(Unittest *t);
+	test_Channel(this);
 }
 
 

@@ -61,23 +61,41 @@ bool ModuleMgr::reloadModule(std::string name, bool keep_data)
 	if (!mi)
 		return false;
 
-	Network *net = m_client ? m_client->getNetwork() : nullptr;
-	if (!keep_data && net) {
-		// Remove this module data from all locations
-		for (Channel *c : net->getAllChannels()) {
-			c->getContainers()->remove(mi->module);
-
-			auto &users = c->getAllUsers();
-			for (auto ui : users)
-				ui->data->remove(mi->module);
-		}
-	}
-
+	IModule *expired_ptr = mi->module;
 	mi->unload();
 	bool ok = mi->load();
 
-	if (!ok)
+	if (!ok) {
+		keep_data = false;
 		m_modules.erase(mi);
+	}
+
+	Network *net = m_client ? m_client->getNetwork() : nullptr;
+	if (net) {
+		if (keep_data) {
+			// Update and re-assign old references
+			// let's hope the two classes were not modified between the module loads
+
+			for (Channel *c : net->getAllChannels()) {
+				c->getContainers()->move(expired_ptr, mi->module);
+
+				auto &users = c->getAllUsers();
+				for (auto ui : users)
+					ui->data->move(expired_ptr, mi->module);
+			}
+		} else {
+			// Remove this module data from all locations
+
+			for (Channel *c : net->getAllChannels()) {
+				c->getContainers()->remove(expired_ptr);
+
+				auto &users = c->getAllUsers();
+				for (auto ui : users)
+					ui->data->remove(expired_ptr);
+			}
+		}
+	}
+
 	return ok;
 }
 

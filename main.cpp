@@ -38,8 +38,11 @@ int main()
 	settings_rw.syncFileContents();
 
 	atexit(exit_main);
+
 	s_cli = new Client(&settings_rw);
+	s_cli->initialize();
 	s_cli->send("PING server");
+
 	while (s_cli->run()) {
 		SLEEP_MS(10);
 	}

@@ -68,3 +68,15 @@ bool Containers::remove(const void *owner)
 	m_data.erase(it);
 	return true;
 }
+
+bool Containers::move(const void *old_owner, const void *new_owner)
+{
+	auto it = m_data.find(old_owner);
+	if (it == m_data.end() || m_data.find(new_owner) != m_data.end())
+		return false;
+
+	IContainer *c = it->second;
+	m_data.erase(it);
+	m_data.insert({new_owner, c});
+	return true;
+}

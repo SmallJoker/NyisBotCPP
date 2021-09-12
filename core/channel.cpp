@@ -1,14 +1,79 @@
 #include "channel.h"
+#include "client.h"
 #include "logger.h"
 #include "utils.h"
 
-Channel::Channel(cstr_t &name)
+IUserOwner::IUserOwner(Client *cli)
 {
-	if (isPrivate(name)) {
-		WARN("Attempt to add private channel " << name);
-		return;
+	if (!cli)
+		ERROR("Client must not be NULL");
+
+	m_client = cli;
+}
+
+IUserOwner::~IUserOwner()
+{
+	for (UserInstance *ui : m_users)
+		ui->drop();
+
+	m_users.clear();
+}
+
+UserInstance *IUserOwner::addUser(cstr_t &name)
+{
+	UserInstance *ui = getUser(name);
+
+	if (!ui) {
+		// Network must always have a reference
+		if (this == m_client->getNetwork())
+			ui = new UserInstance(name);
+		else
+			ui = m_client->getNetwork()->addUser(name);
+		ui->grab();
 	}
 
+	// std::set has unique keys
+	m_users.insert(ui);
+	return ui;
+}
+
+UserInstance *IUserOwner::getUser(cstr_t &name) const
+{
+	for (UserInstance *ui : m_users) {
+		if (ui->nickname == name)
+			return ui;
+	}
+	return nullptr;
+}
+
+
+bool IUserOwner::removeUser(UserInstance *ui)
+{
+	auto it = m_users.find(ui);
+	if (it == m_users.end())
+		return false;
+
+	// Remove from all channels before network itself
+	Network *net = m_client->getNetwork();
+	if (this == net) {
+		for (Channel *c : net->getAllChannels())
+			c->removeUser(ui);
+	}
+
+	ui->drop();
+	m_users.erase(it);
+	return true;
+}
+
+
+Channel::Channel(cstr_t &name, Client *cli) :
+	IUserOwner(cli)
+{
+	if (isPrivate(name))
+		WARN("Attempt to add private channel " << name);
+
+	m_name = name;
+	m_client = cli;
 	m_containers = new Containers();
 }
 
@@ -17,49 +82,43 @@ Channel::~Channel()
 	delete m_containers;
 	m_containers = nullptr;
 
+	for (UserInstance *ui : m_users)
+		ui->drop();
 	m_users.clear();
 }
 
-UserInstance *Channel::addUser(cstr_t &name)
+void Channel::say(cstr_t &text)
 {
-	UserInstance *ui = getUser(name);
-	if (!ui) {
-		ui = new UserInstance(name);
-		m_users.insert(ui);
+	m_client->send("PRIVMSG " + m_name + " :" + text);
+}
+
+void Channel::leave()
+{
+	m_client->send("PART " + m_name);
+}
+
+
+Network::~Network()
+{
+	for (UserInstance *ui : m_users)
+		delete ui;
+	m_users.clear();
+
+	for (Channel *c : m_channels)
+		delete c;
+	m_channels.clear();
+}
+
+Channel *Network::getOrCreateChannel(cstr_t &name)
+{
+	for (Channel *it : m_channels) {
+		if (it->getName() == name)
+			return it;
 	}
-	return ui;
-}
 
-UserInstance *Channel::getUser(cstr_t &name) const
-{
-	for (auto &ui : m_users) {
-		if (ui->nickname == name)
-			return ui;
-	}
-	return nullptr;
-}
-
-
-bool Channel::removeUser(UserInstance *ui)
-{
-	auto it = m_users.find(ui);
-	if (it == m_users.end())
-		return false;
-
-	delete *it;
-	m_users.erase(it);
-	return true;
-}
-
-
-void Channel::say(cstr_t &what)
-{
-	WARN("stub");
-}
-
-void Channel::quit()
-{
-	WARN("stub");
+	Channel *c = new Channel(name, m_client);
+	m_channels.insert(c);
+	return c;
 }
 
 Channel *Network::getChannel()
@@ -71,15 +130,23 @@ Channel *Network::getChannel()
 	return nullptr;
 }
 
-Channel *Network::getOrCreateChannel(cstr_t &name)
+bool Network::removeChannel(Channel *c)
 {
-	for (Channel *it : m_channels) {
-		if (it->getName() == name)
-			return it;
-	}
+	auto it = m_channels.find(c);
+	if (it == m_channels.end())
+		return false;
 
-	Channel *c = new Channel(name);
-	m_channels.insert(c);
-	return c;
+	std::set<UserInstance *> ui_copy = c->getAllUsers();
+
+	delete c;
+	m_channels.erase(it);
+
+	for (UserInstance *ui : ui_copy) {
+		if (ui->getRefs() <= 1) {
+			// Clean up garbage left over after channel removal
+			removeUser(ui);
+		}
+	}
+	return true;
 }
 

@@ -14,8 +14,8 @@ static std::string NAME_PREFIX("libnbm_");
 
 
 struct ModuleInternal {
-	bool load();
-	void unload();
+	bool load(Client *cli);
+	void unload(Network *net);
 
 	void *dll_handle;
 	IModule *module;
@@ -25,13 +25,6 @@ struct ModuleInternal {
 
 
 // ================= IModule =================
-
-void IModule::setClient(Client *cli)
-{
-	m_client = cli;
-	if (cli)
-		onClientReady();
-}
 
 ModuleMgr *IModule::getModuleMgr() const
 {
@@ -100,6 +93,7 @@ bool ModuleMgr::reloadModule(std::string name, bool keep_data)
 		});
 		return true;
 	}
+
 	// This is really ugly
 	m_lock.unlock();
 	MutexLock _(m_lock);
@@ -119,24 +113,16 @@ bool ModuleMgr::reloadModule(std::string name, bool keep_data)
 		return false;
 
 	Network *net = m_client ? m_client->getNetwork() : nullptr;
-	if (net && !keep_data) {
-		// Remove this module data from all locations before the destructor turns invalid
-
-		auto &users = net->getAllUsers();
-		for (auto ui : users)
-			ui->data->remove(mi->module);
-
-		for (Channel *c : net->getAllChannels())
-			c->getContainers()->remove(mi->module);
-	}
-
 	IModule *expired_ptr = mi->module;
-	mi->unload();
-	bool ok = mi->load();
+
+	mi->unload(keep_data ? nullptr : net);
+	bool ok = mi->load(m_client);
 
 	if (ok) {
-		mi->module->setClient(m_client);
+		if (m_client)
+			mi->module->onClientReady();
 	} else {
+		// Well shit. Now it's too late to free the containers
 		keep_data = false;
 		m_modules.erase(mi);
 	}
@@ -159,8 +145,10 @@ bool ModuleMgr::reloadModule(std::string name, bool keep_data)
 void ModuleMgr::unloadModules()
 {
 	LOG("Unloading modules...");
+
+	Network *net = m_client ? m_client->getNetwork() : nullptr;
 	for (ModuleInternal *mi : m_modules) {
-		mi->unload();
+		mi->unload(net);
 		delete mi;
 	}
 	m_modules.clear();
@@ -171,11 +159,13 @@ bool ModuleMgr::loadSingleModule(cstr_t &module_name, cstr_t &path)
 	ModuleInternal *mi = new ModuleInternal();
 	mi->name = module_name;
 	mi->path = path;
-	bool ok = mi->load();
+	bool ok = mi->load(m_client);
 
 	if (ok) {
 		m_modules.insert(mi);
-		mi->module->setClient(m_client);
+
+		if (m_client)
+			mi->module->onClientReady();
 	} else {
 		delete mi;
 	}
@@ -196,13 +186,6 @@ Settings *ModuleMgr::getSettings(IModule *module) const
 		return nullptr;
 
 	return new Settings("config/modules.conf", nullptr, mi->name);
-}
-
-void ModuleMgr::onClientReady()
-{
-	MutexLock _(m_lock);
-	for (ModuleInternal *mi : m_modules)
-		mi->module->onClientReady();
 }
 
 void ModuleMgr::onChannelJoin(Channel *c)
@@ -253,7 +236,7 @@ bool ModuleMgr::onUserSay(Channel *c, ChatInfo info)
 
 // ================= ModuleInternal =================
 
-bool ModuleInternal::load()
+bool ModuleInternal::load(Client *cli)
 {
 	LOG("Loading module " << path);
 	void *handle = dlopen(path.c_str(), RTLD_NOW);
@@ -274,15 +257,29 @@ bool ModuleInternal::load()
 	dll_handle = handle;
 	module = func();
 	if (!module) {
-		unload();
+		unload(nullptr);
 		return false;
 	}
 	module->m_path = &path;
+	module->m_client = cli;
 	return true;
 }
 
-void ModuleInternal::unload()
+void ModuleInternal::unload(Network *net)
 {
+	module->onModuleUnload();
+
+	if (net) {
+		// Remove this module data from all locations before the destructor turns invalid
+
+		auto &users = net->getAllUsers();
+		for (auto ui : users)
+			ui->data->remove(module);
+
+		for (Channel *c : net->getAllChannels())
+			c->getContainers()->remove(module);
+	}
+
 	delete module;
 	dlclose(dll_handle);
 

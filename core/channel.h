@@ -10,6 +10,8 @@
 class Client;
 class Channel;
 
+// This is network-wide
+
 class UserInstance {
 public:
 	UserInstance(cstr_t &name);

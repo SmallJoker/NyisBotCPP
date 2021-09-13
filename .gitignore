@@ -5,7 +5,7 @@ bin/
 build/
 *.kdev4
 
-config/main.user.conf
+config/
 
 # Generated stuff
 CMakeFiles/

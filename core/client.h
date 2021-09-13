@@ -71,17 +71,6 @@ private:
 };
 
 
-struct ChannelUserContainer : public IContainer {
-	enum ChannelPermissions {
-		CP_NONE,
-		CP_CASUAL,
-		CP_IDENTIFIED,
-		CP_ADMIN
-	};
-	std::string modes;
-	ChannelPermissions perm;
-};
-
 struct ClientTodo {
 	enum ClientTodoType {
 		CTT_NONE,

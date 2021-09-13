@@ -23,7 +23,23 @@ public:
 
 	void onClientReady()
 	{
+		if (m_settings)
+			return;
+
 		m_settings = getModuleMgr()->getSettings(this);
+		m_settings->syncFileContents();
+	}
+
+	void onModuleUnload()
+	{
+		if (!m_settings)
+			return;
+
+		for (UserInstance *ui : getNetwork()->getAllUsers()) {
+			BuiltinContainer *bc = (BuiltinContainer *)ui->data->get(this);
+			if (bc)
+				m_settings->set(ui->nickname, bc->remember_text);
+		}
 		m_settings->syncFileContents();
 	}
 
@@ -64,6 +80,7 @@ public:
 			BuiltinContainer *bc = (BuiltinContainer *)info.ui->data->get(this);
 			if (!bc) {
 				bc = new BuiltinContainer();
+				bc->remember_text = m_settings->get(info.ui->nickname);
 				info.ui->data->add(this, bc);
 			}
 
@@ -89,7 +106,7 @@ public:
 			return true;
 		}
 		if (cmd == "$save") {
-			m_settings->syncFileContents();
+			onModuleUnload();
 			return true;
 		}
 		if (cmd == "$quit") {

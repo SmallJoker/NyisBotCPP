@@ -141,6 +141,7 @@ void *Connection::recvAsync(void *con_p)
 			}
 
 			// Strip prepending ':'
+			// This is for IRC only!
 			if (data[offset] == ':')
 				offset++;
 

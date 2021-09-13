@@ -42,7 +42,7 @@ Client::Client(Settings *settings)
 
 Client::~Client()
 {
-	if (m_auth_status != AS_SEND_NICK) {
+	if (m_con && m_auth_status != AS_SEND_NICK) {
 		sendRaw("QUIT :Goodbye");
 		SLEEP_MS(100);
 	}

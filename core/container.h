@@ -17,6 +17,7 @@ public:
 	};
 
 	virtual void onClientReady() {}
+	virtual void onModuleUnload() {}
 	virtual void onChannelJoin(Channel *c) {}
 	virtual void onChannelLeave(Channel *c) {}
 	virtual void onUserJoin(Channel *c, UserInstance *ui) {}

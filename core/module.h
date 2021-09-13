@@ -23,8 +23,6 @@ class IModule : public ICallbackHandler {
 public:
 	virtual ~IModule() {}
 
-	void setClient(Client *cli);
-
 	cstr_t &getModulePath()
 	{ return *m_path; }
 
@@ -55,7 +53,8 @@ public:
 	Settings *getSettings(IModule *module) const;
 
 	// Callback handlers
-	void onClientReady();
+	void onClientReady() {}
+	void onModuleUnload() {}
 	void onChannelJoin(Channel *c);
 	void onChannelLeave(Channel *c);
 	void onUserJoin(Channel *c, UserInstance *ui);

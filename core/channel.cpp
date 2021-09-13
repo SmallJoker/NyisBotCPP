@@ -2,6 +2,9 @@
 #include "client.h"
 #include "logger.h"
 
+
+// ================= UserInstance =================
+
 UserInstance::UserInstance(cstr_t &name)
 {
 	nickname = name;
@@ -14,6 +17,9 @@ UserInstance::~UserInstance()
 	delete data;
 	data = nullptr;
 }
+
+
+// ================= IUserOwner =================
 
 IUserOwner::IUserOwner(Client *cli)
 {
@@ -78,6 +84,8 @@ bool IUserOwner::removeUser(UserInstance *ui)
 }
 
 
+// ================= Channel =================
+
 Channel::Channel(cstr_t &name, Client *cli) :
 	IUserOwner(cli)
 {
@@ -101,14 +109,22 @@ Channel::~Channel()
 
 void Channel::say(cstr_t &text)
 {
-	m_client->send("PRIVMSG " + m_name + " :" + text);
+	m_client->sendRaw("PRIVMSG " + m_name + " :" + text);
+}
+
+void Channel::notice(UserInstance *ui, cstr_t &text)
+{
+	// Some IRC clients show this text in a separate tab... :(
+	m_client->sendRaw("NOTICE " + ui->nickname + " :" + text);
 }
 
 void Channel::leave()
 {
-	m_client->send("PART " + m_name);
+	m_client->sendRaw("PART " + m_name);
 }
 
+
+// ================= Network =================
 
 Network::~Network()
 {

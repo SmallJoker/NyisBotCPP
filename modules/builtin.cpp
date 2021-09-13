@@ -1,8 +1,7 @@
 #include "../core/channel.h"
-#include "../core/module.h"
 #include "../core/logger.h"
-
-#include "../core/client.h"
+#include "../core/module.h"
+#include "../core/settings.h"
 
 struct BuiltinContainer : public IContainer {
 	std::string remember_text;
@@ -17,6 +16,15 @@ public:
 	~nbm_builtin()
 	{
 		LOG("Unload");
+		if (m_settings)
+			m_settings->syncFileContents();
+		delete m_settings;
+	}
+
+	void onClientReady()
+	{
+		m_settings = getModuleMgr()->getSettings(this);
+		m_settings->syncFileContents();
 	}
 
 	void onChannelJoin(Channel *c)
@@ -29,7 +37,8 @@ public:
 	}
 
 	virtual void onUserLeave(Channel *c, UserInstance *ui) {}
-	virtual void onUserRename(Channel *c, UserInstance *ui, cstr_t &new_name) {}
+
+	virtual void onUserRename(UserInstance *ui, cstr_t &old_name) {}
 
 	bool onUserSay(Channel *c, ChatInfo info)
 	{
@@ -69,13 +78,30 @@ public:
 
 			return true;
 		}
+		if (cmd == "$set") {
+			std::string key(get_next_part(info.text));
+			m_settings->set(key, strtrim(info.text));
+			return true;
+		}
+		if (cmd == "$get") {
+			std::string key(get_next_part(info.text));
+			c->say(info.ui->nickname + ": " + m_settings->get(key));
+			return true;
+		}
+		if (cmd == "$save") {
+			m_settings->syncFileContents();
+			return true;
+		}
 		if (cmd == "$quit") {
-			m_client->send("QUIT :Goodbye!");
+			sendRaw("QUIT :Goodbye!");
 			return true;
 		}
 
 		return false;
 	}
+
+private:
+	Settings *m_settings = nullptr;
 };
 
 extern "C" {

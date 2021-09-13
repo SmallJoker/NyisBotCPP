@@ -1,4 +1,5 @@
 #include "utils.h"
+#include <string.h>
 
 // Shameless copy
 std::string strtrim(const std::string &str)
@@ -24,8 +25,10 @@ std::vector<std::string> strsplit(const std::string &input, char delim)
 		if (delim_pos == std::string::npos)
 			delim_pos = input.size();
 
-		if (delim_pos == pos)
+		if (delim_pos == pos) {
+			pos++;
 			continue; // Ignore empty strings
+		}
 
 		parts.emplace_back(input.substr(pos, delim_pos - pos));
 		pos = delim_pos + 1;
@@ -36,15 +39,29 @@ std::vector<std::string> strsplit(const std::string &input, char delim)
 
 std::string get_next_part(std::string &input)
 {
-	auto pos = input.find(' ');
-	std::string value;
-	if (pos == std::string::npos) {
-		std::swap(value, input);
-		return value;
+	char *pos_a = &input[0];
+	while (*pos_a && std::isspace(*pos_a))
+		pos_a++;
+
+	char *pos_b = pos_a;
+	while (*pos_b && !std::isspace(*pos_b))
+		pos_b++;
+
+	if (!*pos_a) {
+		// End reached
+		input.clear();
+		return "";
 	}
 
-	value = input.substr(0, pos);
-	input = input.substr(pos + 1);
+	// Split into two parts
+	bool ended = !*pos_b;
+	*pos_b = '\0';
+
+	std::string value(pos_a); // Until terminator
+	if (ended)
+		input.clear();
+	else
+		input = std::string(pos_b + 1);
 	return value;
 }
 
@@ -60,4 +77,25 @@ bool is_yes(std::string what)
 		c = tolower(c);
 
 	return (what == "true" || what == "yes" || what == "on" || what == "enabled");
+}
+
+void apply_user_modes(char *buf, const std::string &modifier)
+{
+	bool add = (modifier[0] != '-');
+	for (char c : modifier) {
+		if (c == '+' || c == '-')
+			continue;
+
+		char *pos = strchr(buf, c);
+		if (add == (pos != nullptr))
+			continue; // Nothing to changed
+
+		if (add) {
+			pos = strchr(buf, ' ');
+			if (pos)
+				*pos = c;
+		} else {
+			*pos = ' ';
+		}
+	}
 }

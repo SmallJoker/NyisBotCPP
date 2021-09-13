@@ -24,6 +24,7 @@ DLL_EXPORT int main()
 		Unittest test;
 		if (!test.runTests())
 			exit(EXIT_FAILURE);
+		exit(EXIT_SUCCESS);
 	}
 
 	if (0) {
@@ -45,10 +46,11 @@ DLL_EXPORT int main()
 	atexit(exit_main);
 
 	s_cli = new Client(&settings_rw);
-	s_cli->getModuleMgr()->loadModules();
-	//exit(1);
+	if (!s_cli->getModuleMgr()->loadModules())
+		exit(EXIT_FAILURE);
+
 	s_cli->initialize();
-	s_cli->send("PING server");
+	s_cli->sendRaw("PING server");
 
 	while (s_cli->run()) {
 		s_cli->processTodos();

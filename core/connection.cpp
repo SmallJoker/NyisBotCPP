@@ -41,7 +41,6 @@ Connection::~Connection()
 	m_is_alive = false;
 
 	if (m_thread) {
-		pthread_cancel(m_thread);
 		pthread_join(m_thread, nullptr);
 		m_thread = 0;
 	}
@@ -127,7 +126,6 @@ void *Connection::recvAsync(void *con_p)
 			SLEEP_MS(100);
 			continue;
 		}
-		//VERBOSE(">> Received " << nread << " bytes");
 
 		size_t offset = 0;
 		while (true) {
@@ -152,7 +150,6 @@ void *Connection::recvAsync(void *con_p)
 			{
 				MutexLock _(con->m_recv_queue_lock);
 				con->m_recv_queue.push(data.substr(offset, length - has_cr));
-				//VERBOSE("len=" << length << ", text=" << con->m_recv_queue.back());
 			}
 
 			offset += length + 1; // + '\n'
@@ -165,7 +162,6 @@ void *Connection::recvAsync(void *con_p)
 			else
 				data.clear();
 		}
-		SLEEP_MS(50);
 	}
 
 	LOG("Stop!");

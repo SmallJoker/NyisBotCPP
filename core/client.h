@@ -30,7 +30,7 @@ public:
 	void addTodo(ClientTodo && ct);
 	void processTodos();
 
-	void send(cstr_t &text);
+	void sendRaw(cstr_t &text);
 	bool run();
 
 private:
@@ -65,6 +65,9 @@ private:
 	// Cached settings
 	std::string m_nickname;
 	long m_auth_type;
+
+	// User mode. This should be enough space.
+	char m_user_modes[13] = "            ";
 };
 
 

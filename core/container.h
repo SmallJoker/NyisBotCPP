@@ -16,11 +16,12 @@ public:
 		std::string text;
 	};
 
+	virtual void onClientReady() {}
 	virtual void onChannelJoin(Channel *c) {}
 	virtual void onChannelLeave(Channel *c) {}
 	virtual void onUserJoin(Channel *c, UserInstance *ui) {}
 	virtual void onUserLeave(Channel *c, UserInstance *ui) {}
-	virtual void onUserRename(Channel *c, UserInstance *ui, const std::string &old_name) {}
+	virtual void onUserRename(UserInstance *ui, const std::string &old_name) {}
 	virtual bool onUserSay(Channel *c, ChatInfo info) { return false; }
 };
 

@@ -3,13 +3,14 @@
 #include "client.h"
 #include "logger.h"
 #include "module.h"
+#include "settings.h"
 #include "utils.h"
 
 #include <filesystem>
 // Unix only
 #include <dlfcn.h>
 
-static const char *NAME_PREFIX = "libnbm_";
+static std::string NAME_PREFIX("libnbm_");
 
 
 struct ModuleInternal {
@@ -18,8 +19,19 @@ struct ModuleInternal {
 
 	void *dll_handle;
 	IModule *module;
+	std::string name;
 	std::string path;
 };
+
+
+// ================= IModule =================
+
+void IModule::setClient(Client *cli)
+{
+	m_client = cli;
+	if (cli)
+		onClientReady();
+}
 
 ModuleMgr *IModule::getModuleMgr() const
 {
@@ -31,29 +43,47 @@ Network *IModule::getNetwork() const
 	return m_client->getNetwork();
 }
 
+void IModule::sendRaw(cstr_t &what) const
+{
+	m_client->sendRaw(what);
+}
+
+
+// ================= ModuleMgr =================
+
 ModuleMgr::~ModuleMgr()
 {
 	unloadModules();
 }
 
-void ModuleMgr::loadModules()
+bool ModuleMgr::loadModules()
 {
 	if (m_modules.size() > 0)
-		return;
+		return false;
 
+	bool good = true;
 	// Find modules in path, named "libnbm_?????.so"
 	for (const auto &entry : std::filesystem::directory_iterator("modules")) {
-		const std::string &name = entry.path().filename();
-		size_t cut_a = name.rfind(NAME_PREFIX);
-		size_t cut_b = name.find('.');
+		const std::string &filename = entry.path().filename();
+		size_t cut_a = filename.rfind(NAME_PREFIX);
+		size_t cut_b = filename.find('.');
 		if (cut_a == std::string::npos || cut_b == std::string::npos)
 			continue;
 		if (entry.path().extension() == "so")
 			continue;
 
-		if (!loadSingleModule(entry.path().string()))
-			exit(1);
+		cut_a += NAME_PREFIX.size();
+		std::string module_name(filename.substr(cut_a, cut_b - cut_a));
+
+		if (!loadSingleModule(module_name, entry.path().string())) {
+			good = false;
+			break;
+		}
 	}
+
+	if (!good)
+		unloadModules();
+	return good;
 }
 
 bool ModuleMgr::reloadModule(std::string name, bool keep_data)
@@ -136,9 +166,10 @@ void ModuleMgr::unloadModules()
 	m_modules.clear();
 }
 
-bool ModuleMgr::loadSingleModule(const std::string &path)
+bool ModuleMgr::loadSingleModule(cstr_t &module_name, cstr_t &path)
 {
 	ModuleInternal *mi = new ModuleInternal();
+	mi->name = module_name;
 	mi->path = path;
 	bool ok = mi->load();
 
@@ -150,6 +181,28 @@ bool ModuleMgr::loadSingleModule(const std::string &path)
 	}
 
 	return ok;
+}
+
+Settings *ModuleMgr::getSettings(IModule *module) const
+{
+	ModuleInternal *mi = nullptr;
+	for (ModuleInternal *it : m_modules) {
+		if (it->module == module) {
+			mi = it;
+			break;
+		}
+	}
+	if (!mi)
+		return nullptr;
+
+	return new Settings("config/modules.conf", nullptr, mi->name);
+}
+
+void ModuleMgr::onClientReady()
+{
+	MutexLock _(m_lock);
+	for (ModuleInternal *mi : m_modules)
+		mi->module->onClientReady();
 }
 
 void ModuleMgr::onChannelJoin(Channel *c)
@@ -180,11 +233,11 @@ void ModuleMgr::onUserLeave(Channel *c, UserInstance *ui)
 		mi->module->onUserLeave(c, ui);
 }
 
-void ModuleMgr::onUserRename(Channel *c, UserInstance *ui, cstr_t &old_name)
+void ModuleMgr::onUserRename(UserInstance *ui, cstr_t &old_name)
 {
 	MutexLock _(m_lock);
 	for (ModuleInternal *mi : m_modules)
-		mi->module->onUserRename(c, ui, old_name);
+		mi->module->onUserRename(ui, old_name);
 }
 
 bool ModuleMgr::onUserSay(Channel *c, ChatInfo info)
@@ -197,7 +250,8 @@ bool ModuleMgr::onUserSay(Channel *c, ChatInfo info)
 	return false;
 }
 
-// -------- Internal functions --------
+
+// ================= ModuleInternal =================
 
 bool ModuleInternal::load()
 {

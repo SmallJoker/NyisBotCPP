@@ -43,7 +43,7 @@ Client::Client(Settings *settings)
 Client::~Client()
 {
 	if (m_auth_status != AS_SEND_NICK) {
-		send("QUIT :Goodbye");
+		sendRaw("QUIT :Goodbye");
 		SLEEP_MS(100);
 	}
 
@@ -105,7 +105,7 @@ void Client::processTodos()
 	}
 }
 
-void Client::send(cstr_t &text)
+void Client::sendRaw(cstr_t &text)
 {
 	m_con->send(text + '\n');
 }
@@ -211,7 +211,8 @@ void Client::handleClientEvent(cstr_t &status, NetworkEvent *e)
 	e->dump();
 
 	if (status == "JOIN") {
-		cstr_t channel = e->text.substr(e->text[0] == ':');
+		// nick!host JOIN :channel
+		cstr_t &channel = e->text;
 		Channel *c = m_network->getChannel(channel);
 		if (!c) {
 			c = m_network->addChannel(channel);
@@ -239,38 +240,31 @@ void Client::handleClientEvent(cstr_t &status, NetworkEvent *e)
 			return;
 		}
 
-		// Add and remove user modes
-		bool add = (e->text[0] != '-');
-		for (char c : e->text) {
-			if (c == '+' || c == '-')
-				continue;
-
-			char *pos = strchr(ui->modes, c);
-			if (add == (pos != nullptr))
-				continue; // Nothing to changed
-
-			if (add) {
-				pos = strchr(ui->modes, ' ');
-				if (pos)
-					*pos = c;
-			} else {
-				*pos = ' ';
-			}
-		}
-
 		if (what == m_nickname) {
+			// Add and remove user modes
+			apply_user_modes(m_user_modes, e->text);
+
 			// Our mode updated. Auth, if not already done.
 			if (m_auth_status == AS_AUTHENTICATE) {
 				if (m_auth_type > 0)
-					send("PRIVMSG NickServ :identify " + m_settings->get("client.password"));
+					sendRaw("PRIVMSG NickServ :identify " + m_settings->get("client.password"));
 			}
 
-			if (strchr(ui->modes, 'r'))
+			if (strchr(m_user_modes, 'r'))
 				m_auth_status = AS_JOIN_CHANNELS;
 		}
 		return;
 	}
+	if (status == "NICK") {
+		// nick!host NICK :NewNickname
+		UserInstance *ui = m_network->getUser(e->nickname);
+		ui->nickname = e->text;
+
+		m_module_mgr->onUserRename(ui, e->nickname);
+		return;
+	}
 	if (status == "PART" || status == "KICK") {
+		// nick!host PART channel :reason
 		cstr_t &channel = e->args[2];
 		Channel *c = m_network->getChannel(channel);
 		UserInstance *ui = c->getUser(e->nickname);
@@ -313,7 +307,7 @@ void Client::handleClientEvent(cstr_t &status, NetworkEvent *e)
 		return;
 	}
 	if (status == "INVITE") {
-		send("JOIN " + e->text);
+		sendRaw("JOIN " + e->text);
 		return;
 	}
 }
@@ -373,7 +367,7 @@ void Client::handleChatMessage(cstr_t &status, NetworkEvent *e)
 void Client::handlePing(cstr_t &status, NetworkEvent *e)
 {
 	//VERBOSE("PONG!");
-	send("PONG " + e->text);
+	sendRaw("PONG " + e->text);
 }
 
 void Client::handleAuthentication(cstr_t &status, NetworkEvent *e)
@@ -381,8 +375,8 @@ void Client::handleAuthentication(cstr_t &status, NetworkEvent *e)
 	if (m_auth_status == AS_SEND_NICK) {
 		LOG("Auth with nick: " << m_nickname);
 
-		send("USER " + m_nickname + " foo bar :Generic description");
-		send("NICK " + m_nickname);
+		sendRaw("USER " + m_nickname + " foo bar :Generic description");
+		sendRaw("NICK " + m_nickname);
 
 		SettingTypeLong at; m_settings->get("client.authtype", &at);
 		if (at.value > 0)
@@ -437,7 +431,7 @@ void Client::joinChannels()
 		if (chan.size() < 2 || chan[0] != '#')
 			continue;
 
-		send("JOIN " + chan);
+		sendRaw("JOIN " + chan);
 	}
 }
 
@@ -463,8 +457,9 @@ const ClientActionEntry Client::s_actions[] = {
 	{ 1, "366", &Client::handleChatMessage },  // RPL_ENDOFNAMES
 // Client/user events
 	{ 1, "JOIN", &Client::handleClientEvent },
-	{ 0, "NICK", &Client::handleClientEvent },
-	{ 0, "PART", &Client::handleClientEvent },
+	{ 1, "NICK", &Client::handleClientEvent },
+	{ 1, "KICK", &Client::handleClientEvent },
+	{ 1, "PART", &Client::handleClientEvent },
 	{ 0, "QUIT", &Client::handleClientEvent },
 	{ 1, "MODE",  &Client::handleClientEvent },
 	{ 1, "PRIVMSG", &Client::handleChatMessage },

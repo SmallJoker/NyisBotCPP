@@ -40,9 +40,6 @@ public:
 	};
 	UserAccStatus account = UAS_UNKNOWN;
 
-	// User mode. This should be enough space.
-	char modes[13] = "            ";
-
 private:
 	int m_references;
 };
@@ -84,6 +81,7 @@ public:
 	{ return m_containers; }
 
 	void say(cstr_t &text);
+	void notice(UserInstance *ui, cstr_t &text);
 	void leave();
 private:
 	std::string m_name;

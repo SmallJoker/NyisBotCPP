@@ -28,9 +28,9 @@ public:
 	~Settings();
 
 	cstr_t &get(cstr_t &key) const;
-	void set(cstr_t &key, cstr_t &value);
+	bool set(cstr_t &key, cstr_t &value);
 	bool get(cstr_t &key, SettingType *type) const;
-	void set(cstr_t &key, SettingType *type);
+	bool set(cstr_t &key, SettingType *type);
 	bool remove(cstr_t &key);
 
 	bool syncFileContents();

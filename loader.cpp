@@ -4,6 +4,12 @@
 
 int main()
 {
+	/*
+		Load the entire bot which is a shared library
+		This step is necessary to get API calls from
+		Bot <--> Module working in both directions
+	*/
+
 	void *handle = dlopen("./libNyisBotCPP.so", RTLD_NOW);
 	if (!handle) {
 		std::cerr << "Failed to load library: " << dlerror() << std::endl;

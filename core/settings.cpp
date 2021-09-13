@@ -46,17 +46,17 @@ cstr_t &Settings::get(cstr_t &key) const
 		return it->second;
 
 	if (m_parent)
-		return m_parent->get(key);
+		return m_parent->get(KEY_RAW(key));
 
-	WARN("Attempt to access unknown setting " << key);
+	WARN("Attempt to access unknown setting " << KEY_RAW(key));
 	return unknown_setting;
 }
 
-void Settings::set(cstr_t &key, cstr_t &value)
+bool Settings::set(cstr_t &key, cstr_t &value)
 {
 	if (!is_valid_key(key)) {
 		WARN("Invalid key '" << key << "'");
-		return;
+		return false;
 	}
 
 	MutexLock _(m_lock);
@@ -64,6 +64,7 @@ void Settings::set(cstr_t &key, cstr_t &value)
 	std::string keyp = KEY_RAW(key);
 	m_modified.insert(keyp);
 	m_settings[keyp] = value;
+	return true;
 }
 
 
@@ -73,11 +74,10 @@ bool Settings::get(cstr_t &key, SettingType *type) const
 	return type->deSerialize(val);
 }
 
-void Settings::set(cstr_t &key, SettingType *type)
+bool Settings::set(cstr_t &key, SettingType *type)
 {
-	set(key, type->serialize());
+	return set(key, type->serialize());
 }
-
 
 bool Settings::remove(cstr_t &key)
 {
@@ -100,8 +100,20 @@ bool Settings::syncFileContents()
 
 	std::ifstream is(m_file);
 	if (!is.good()) {
-		WARN("File '" << m_file << "' not found");
-		return false;
+		if (m_modified.size() == 0) {
+			WARN("File '" << m_file << "' not found");
+			return false;
+		}
+
+		// Create new file
+		std::ofstream os(m_file);
+		if (!os.good()) {
+			ERROR("Failed to create file: '" << m_file << "'");
+			return false;
+		}
+
+		os.close();
+		is = std::ifstream(m_file);
 	}
 
 	std::string new_file = m_file + ".~new";

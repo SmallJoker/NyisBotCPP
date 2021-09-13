@@ -15,6 +15,7 @@ class Channel;
 class Client;
 class ModuleMgr;
 class Network;
+class Settings;
 class UserInstance;
 struct ModuleInternal;
 
@@ -22,8 +23,7 @@ class IModule : public ICallbackHandler {
 public:
 	virtual ~IModule() {}
 
-	void setClient(Client *cli)
-	{ m_client = cli; }
+	void setClient(Client *cli);
 
 	cstr_t &getModulePath()
 	{ return *m_path; }
@@ -32,11 +32,12 @@ protected:
 	// Avoids inclusion of "client.h" in modules
 	ModuleMgr *getModuleMgr() const;
 	Network *getNetwork() const;
+	void sendRaw(cstr_t &what) const;
 
-	Client *m_client;
 private:
 	friend struct ModuleInternal;
 	const std::string *m_path = nullptr;
+	Client *m_client = nullptr;
 };
 
 
@@ -48,20 +49,21 @@ public:
 		m_client(cli) {}
 	~ModuleMgr();
 
-	void addModule(IModule &&module);
-	void loadModules();
+	bool loadModules();
 	bool reloadModule(std::string name, bool keep_data = false);
 	void unloadModules();
+	Settings *getSettings(IModule *module) const;
 
 	// Callback handlers
+	void onClientReady();
 	void onChannelJoin(Channel *c);
 	void onChannelLeave(Channel *c);
 	void onUserJoin(Channel *c, UserInstance *ui);
 	void onUserLeave(Channel *c, UserInstance *ui);
-	void onUserRename(Channel *c, UserInstance *ui, cstr_t &old_name);
+	void onUserRename(UserInstance *ui, cstr_t &old_name);
 	bool onUserSay(Channel *c, ChatInfo info);
 private:
-	bool loadSingleModule(const std::string &path);
+	bool loadSingleModule(cstr_t &module_name, cstr_t &path);
 
 	std::mutex m_lock;
 	std::set<ModuleInternal *> m_modules;

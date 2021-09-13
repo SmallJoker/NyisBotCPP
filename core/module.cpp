@@ -21,6 +21,16 @@ struct ModuleInternal {
 	std::string path;
 };
 
+ModuleMgr *IModule::getModuleMgr() const
+{
+	return m_client->getModuleMgr();
+}
+
+Network *IModule::getNetwork() const
+{
+	return m_client->getNetwork();
+}
+
 ModuleMgr::~ModuleMgr()
 {
 	unloadModules();
@@ -48,6 +58,22 @@ void ModuleMgr::loadModules()
 
 bool ModuleMgr::reloadModule(std::string name, bool keep_data)
 {
+	bool can_lock = m_lock.try_lock();
+	if (!can_lock) {
+		LOG("Delaying module reload");
+		m_client->addTodo(ClientTodo {
+			.type = ClientTodo::CTT_RELOAD_MODULE,
+			.reload_module = {
+				.path = new std::string(name),
+				.keep_data = keep_data
+			}
+		});
+		return true;
+	}
+	// This is really ugly
+	m_lock.unlock();
+	MutexLock _(m_lock);
+
 	name = NAME_PREFIX + name;
 
 	ModuleInternal *mi = nullptr;
@@ -62,6 +88,18 @@ bool ModuleMgr::reloadModule(std::string name, bool keep_data)
 	if (!mi)
 		return false;
 
+	Network *net = m_client ? m_client->getNetwork() : nullptr;
+	if (net && !keep_data) {
+		// Remove this module data from all locations before the destructor turns invalid
+
+		auto &users = net->getAllUsers();
+		for (auto ui : users)
+			ui->data->remove(mi->module);
+
+		for (Channel *c : net->getAllChannels())
+			c->getContainers()->remove(mi->module);
+	}
+
 	IModule *expired_ptr = mi->module;
 	mi->unload();
 	bool ok = mi->load();
@@ -73,30 +111,16 @@ bool ModuleMgr::reloadModule(std::string name, bool keep_data)
 		m_modules.erase(mi);
 	}
 
-	Network *net = m_client ? m_client->getNetwork() : nullptr;
-	if (net) {
-		if (keep_data) {
-			// Update and re-assign old references
-			// let's hope the two classes were not modified between the module loads
+	if (net && keep_data) {
+		// Update and re-assign old references
+		// let's hope the two classes were not modified between the module loads
 
-			for (Channel *c : net->getAllChannels()) {
-				c->getContainers()->move(expired_ptr, mi->module);
+		auto &users = net->getAllUsers();
+		for (auto ui : users)
+			ui->data->move(expired_ptr, mi->module);
 
-				auto &users = c->getAllUsers();
-				for (auto ui : users)
-					ui->data->move(expired_ptr, mi->module);
-			}
-		} else {
-			// Remove this module data from all locations
-
-			for (Channel *c : net->getAllChannels()) {
-				c->getContainers()->remove(expired_ptr);
-
-				auto &users = c->getAllUsers();
-				for (auto ui : users)
-					ui->data->remove(expired_ptr);
-			}
-		}
+		for (Channel *c : net->getAllChannels())
+			c->getContainers()->move(expired_ptr, mi->module);
 	}
 
 	return ok;
@@ -128,14 +152,52 @@ bool ModuleMgr::loadSingleModule(const std::string &path)
 	return ok;
 }
 
-bool ModuleMgr::onUserSay(Channel *c, const ChatInfo &info)
+void ModuleMgr::onChannelJoin(Channel *c)
 {
+	MutexLock _(m_lock);
+	for (ModuleInternal *mi : m_modules)
+		mi->module->onChannelJoin(c);
+}
+
+void ModuleMgr::onChannelLeave(Channel *c)
+{
+	MutexLock _(m_lock);
+	for (ModuleInternal *mi : m_modules)
+		mi->module->onChannelLeave(c);
+}
+
+void ModuleMgr::onUserJoin(Channel *c, UserInstance *ui)
+{
+	MutexLock _(m_lock);
+	for (ModuleInternal *mi : m_modules)
+		mi->module->onUserJoin(c, ui);
+}
+
+void ModuleMgr::onUserLeave(Channel *c, UserInstance *ui)
+{
+	MutexLock _(m_lock);
+	for (ModuleInternal *mi : m_modules)
+		mi->module->onUserLeave(c, ui);
+}
+
+void ModuleMgr::onUserRename(Channel *c, UserInstance *ui, cstr_t &old_name)
+{
+	MutexLock _(m_lock);
+	for (ModuleInternal *mi : m_modules)
+		mi->module->onUserRename(c, ui, old_name);
+}
+
+bool ModuleMgr::onUserSay(Channel *c, ChatInfo info)
+{
+	MutexLock _(m_lock);
 	for (ModuleInternal *mi : m_modules) {
 		if (mi->module->onUserSay(c, info))
 			return true;
 	}
 	return false;
 }
+
+// -------- Internal functions --------
 
 bool ModuleInternal::load()
 {
@@ -157,6 +219,11 @@ bool ModuleInternal::load()
 
 	dll_handle = handle;
 	module = func();
+	if (!module) {
+		unload();
+		return false;
+	}
+	module->m_path = &path;
 	return true;
 }
 

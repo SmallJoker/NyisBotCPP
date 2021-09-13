@@ -1,12 +1,14 @@
 #include "connection.h"
 #include "logger.h"
+#include "utils.h" // strtrim
 #include <curl/curl.h>
+#include <pthread.h>
 #include <sstream>
+#include <string.h>
 
-	
-Connection::Connection(const std::string &address, int port)
+Connection::Connection(cstr_t &address, int port)
 {
-    // Open connection
+	// Open connection
 	curl_global_init(CURL_GLOBAL_ALL);
 
 	m_curl = curl_easy_init();
@@ -25,26 +27,34 @@ Connection::Connection(const std::string &address, int port)
 	ASSERT(res == CURLE_OK, "curl failed: " << curl_easy_strerror(res));
 	//res = curl_easy_getinfo(m_curl, CURLINFO_ACTIVESOCKET, &m_socket);
 
-	m_thread = new std::thread(recvAsync, this);
+	m_is_alive = true;
+	int status = pthread_create(&m_thread, nullptr, &recvAsync, this);
+	if (status != 0)
+		ERROR("pthread failed: " << strerror(status));
+
+	// https://gcc.gnu.org/bugzilla/show_bug.cgi?id=67791
+	//m_thread = new std::thread(recvAsync, this);
 }
 
 Connection::~Connection()
 {
 	m_is_alive = false;
 
-	m_thread->join();
-	delete m_thread;
-	m_thread = nullptr;
+	if (m_thread) {
+		pthread_cancel(m_thread);
+		pthread_join(m_thread, nullptr);
+		m_thread = 0;
+	}
 
 	// Disconnect
 	curl_easy_cleanup(m_curl);
 	curl_global_cleanup();
 }
 
-bool Connection::send(const std::string &data)
+bool Connection::send(cstr_t &data)
 {
 	if (data.size() < 255)
-		LOG("<< Sending: " << data);
+		LOG("<< Sending: " << strtrim(data));
 	else
 		LOG("<< Sending " << data.size() << " bytes");
 
@@ -104,8 +114,9 @@ size_t Connection::recv(std::string &data)
 	return nread;
 }
 
-void Connection::recvAsync(Connection *con)
+void *Connection::recvAsync(void *con_p)
 {
+	Connection *con = (Connection *)con_p;
 	// Receive thread function
 	std::string data;
 
@@ -158,4 +169,5 @@ void Connection::recvAsync(Connection *con)
 	}
 
 	LOG("Stop!");
+	return nullptr;
 }

@@ -1,7 +1,7 @@
 #include "utils.h"
 
 // Shameless copy
-std::string trim(cstr_t &str)
+std::string strtrim(const std::string &str)
 {
 	size_t front = 0;
 
@@ -15,7 +15,7 @@ std::string trim(cstr_t &str)
 	return str.substr(front, back - front);
 }
 
-std::vector<std::string> strsplit(cstr_t &input, char delim)
+std::vector<std::string> strsplit(const std::string &input, char delim)
 {
 	std::vector<std::string> parts;
 
@@ -48,49 +48,16 @@ std::string get_next_part(std::string &input)
 	return value;
 }
 
-
-Containers::~Containers()
+bool is_yes(std::string what)
 {
-	for (auto &it : m_data) {
-		delete it.second;
-		it.second = nullptr;
-	}
-}
+	what = strtrim(what);
+	int num = 0;
+	sscanf(what.c_str(), "%i", &num);
+	if (num > 0)
+		return true;
 
-bool Containers::add(const void *owner, IContainer *data)
-{
-	if (get(owner))
-		return false;
+	for (char &c : what)
+		c = tolower(c);
 
-	m_data.insert({owner, data});
-	return true;
-}
-
-IContainer *Containers::get(const void *owner) const
-{
-	auto it = m_data.find(owner);
-	return (it == m_data.end()) ? nullptr : it->second;
-}
-
-bool Containers::remove(const void *owner)
-{
-	auto it = m_data.find(owner);
-	if (it == m_data.end())
-		return false;
-
-	delete it->second;
-	m_data.erase(it);
-	return true;
-}
-
-bool Containers::move(const void *old_owner, const void *new_owner)
-{
-	auto it = m_data.find(old_owner);
-	if (it == m_data.end() || m_data.find(new_owner) != m_data.end())
-		return false;
-
-	IContainer *c = it->second;
-	m_data.erase(it);
-	m_data.insert({new_owner, c});
-	return true;
+	return (what == "true" || what == "yes" || what == "on" || what == "enabled");
 }

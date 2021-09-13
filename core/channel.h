@@ -1,27 +1,19 @@
 #pragma once
 
+#include "container.h"
+#include "types.h"
 #include "utils.h"
 #include <set>
 
-#include <iostream>
+//#include <iostream>
 
 class Client;
 class Channel;
 
 class UserInstance {
 public:
-	UserInstance(cstr_t &name)
-	{
-		nickname = name;
-		data = new Containers();
-		m_references = 0;
-	}
-	~UserInstance()
-	{
-		//std::cout << "Deleted " << nickname << std::endl;
-		delete data;
-		data = nullptr;
-	}
+	UserInstance(cstr_t &name);
+	~UserInstance();
 	void grab()
 	{
 		m_references++;
@@ -47,6 +39,9 @@ public:
 		UAS_LOGGED_IN = 3
 	};
 	UserAccStatus account = UAS_UNKNOWN;
+
+	// User mode. This should be enough space.
+	char modes[13] = "            ";
 
 private:
 	int m_references;

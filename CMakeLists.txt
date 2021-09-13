@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 message("--- Setting up NyisBotCPP")
 
 find_package(CURL REQUIRED)
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads REQUIRED) # pthread
 
 if (NOT MSVC)
@@ -35,6 +36,7 @@ include_directories(
 )
 
 add_library(${PROJECT_NAME} SHARED ${SRC_FILES})
+#add_executable(${PROJECT_NAME} ${SRC_FILES})
 
 target_link_libraries(
 	${PROJECT_NAME}

@@ -21,6 +21,20 @@
 		throw std::string("Assertion failed"); \
 	}
 
+void sleep_ms(long long ms);
+#define SLEEP_MS(x) sleep_ms(x)
 
-#define SLEEP_MS(ms) \
-	std::this_thread::sleep_for(std::chrono::milliseconds((ms)));
+void write_timestamp(std::ostream *os);
+void write_datetime(std::ostream *os);
+
+class Logger {
+public:
+	Logger(const char *filename);
+	~Logger();
+
+	std::ostream *get() const
+	{ return m_file; }
+
+private:
+	std::ostream *m_file;
+};

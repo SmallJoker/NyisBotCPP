@@ -1,18 +1,17 @@
 #pragma once
 
+#include "types.h"
 #include <queue>
-#include <string>
-#include <thread>
-#include "mutex.h"
+//#include <thread>
 
 class Connection;
 
 class Connection {
 public:
-	Connection(const std::string &address, int port);
+	Connection(cstr_t &address, int port);
 	~Connection();
 	
-	bool send(const std::string &data);
+	bool send(cstr_t &data);
 	std::string *popRecv();
 
 private:
@@ -21,11 +20,11 @@ private:
 	static constexpr unsigned RECEIVE_BUFSIZE = 1024;
 
 	size_t recv(std::string &data);
-	static void recvAsync(Connection *con);
+	static void *recvAsync(void *con);
 
-	std::thread *m_thread;
+	pthread_t m_thread = 0;
 	std::queue<std::string> m_recv_queue;
 	std::mutex m_recv_queue_lock;
 	void *m_curl;
-	bool m_is_alive = true;
+	bool m_is_alive = false;
 };

@@ -1,8 +1,8 @@
 
 #include "test.h"
+#include "../core/container.h"
 #include "../core/logger.h"
 #include "../core/module.h"
-#include "../core/utils.h"
 
 
 void test_Module_load_unload()

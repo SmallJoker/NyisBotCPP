@@ -1,13 +1,16 @@
 #pragma once
 
-#include "utils.h"
-#include <thread>
+#include "container.h"
+#include "types.h"
+#include <queue>
 
 class Connection;
+class Logger;
 class ModuleMgr;
 class Network;
 class Settings;
 struct ClientActionEntry;
+struct ClientTodo;
 struct NetworkEvent;
 
 class Client {
@@ -24,6 +27,9 @@ public:
 	Network *getNetwork() const
 	{ return m_network; }
 
+	void addTodo(ClientTodo && ct);
+	void processTodos();
+
 	void send(cstr_t &text);
 	bool run();
 
@@ -39,10 +45,14 @@ private:
 	void joinChannels();
 
 	Connection *m_con = nullptr;
+	Logger *m_log = nullptr;
 	ModuleMgr *m_module_mgr = nullptr;
 	Network *m_network = nullptr;
 	Settings *m_settings = nullptr;
 	static const ClientActionEntry s_actions[];
+
+	std::mutex m_todo_lock;
+	std::queue<ClientTodo> m_todo;
 
 	enum AuthStatus {
 		AS_SEND_NICK,
@@ -67,4 +77,18 @@ struct ChannelUserContainer : public IContainer {
 	};
 	std::string modes;
 	ChannelPermissions perm;
+};
+
+struct ClientTodo {
+	enum ClientTodoType {
+		CTT_NONE,
+		CTT_RELOAD_MODULE,
+	} type = CTT_NONE;
+
+	union {
+		struct {
+			std::string *path;
+			bool keep_data;
+		} reload_module;
+	};
 };

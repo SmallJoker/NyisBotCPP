@@ -1,7 +1,19 @@
 #include "channel.h"
 #include "client.h"
 #include "logger.h"
-#include "utils.h"
+
+UserInstance::UserInstance(cstr_t &name)
+{
+	nickname = name;
+	data = new Containers();
+	m_references = 0;
+}
+
+UserInstance::~UserInstance()
+{
+	delete data;
+	data = nullptr;
+}
 
 IUserOwner::IUserOwner(Client *cli)
 {

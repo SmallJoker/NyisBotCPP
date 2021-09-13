@@ -51,7 +51,8 @@ DLL_EXPORT int main()
 	s_cli->send("PING server");
 
 	while (s_cli->run()) {
-		SLEEP_MS(10);
+		s_cli->processTodos();
+		SLEEP_MS(20);
 	}
 
 	delete s_cli;

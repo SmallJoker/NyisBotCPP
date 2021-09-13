@@ -6,9 +6,8 @@
 #include "logger.h"
 #include "module.h"
 #include "settings.h"
-#include <ctime>
 #include <cstring>
-#include <iomanip> // std::put_time
+#include <memory> // unique_ptr
 
 struct ClientActionEntry {
 	int offset;
@@ -36,6 +35,7 @@ Client::Client(Settings *settings)
 {
 	m_settings = settings;
 
+	m_log = new Logger("debug.txt");
 	m_network = new Network(this);
 	m_module_mgr = new ModuleMgr(this);
 }
@@ -55,6 +55,9 @@ Client::~Client()
 
 	delete m_con;
 	m_con = nullptr;
+
+	delete m_log;
+	m_log = nullptr;
 }
 
 void Client::initialize()
@@ -67,6 +70,39 @@ void Client::initialize()
 	SettingTypeLong port;     m_settings->get("client.port", &port);
 
 	m_con = new Connection(addr, port.value);
+}
+
+void Client::addTodo(ClientTodo && ct)
+{
+	m_todo_lock.lock();
+	m_todo.push(std::move(ct));
+	m_todo_lock.unlock();
+}
+
+void Client::processTodos()
+{
+	if (m_todo.empty())
+		return;
+
+	ClientTodo ct;
+	{
+		m_todo_lock.lock();
+		std::swap(m_todo.front(), ct);
+		m_todo.pop();
+		m_todo_lock.unlock();
+	}
+
+	VERBOSE("Got type " << (int)ct.type);
+	switch (ct.type) {
+		case ClientTodo::CTT_NONE:
+			return;
+		case ClientTodo::CTT_RELOAD_MODULE:
+			m_module_mgr->reloadModule(
+				*ct.reload_module.path,
+				ct.reload_module.keep_data);
+			delete ct.reload_module.path;
+			return;
+	}
 }
 
 void Client::send(cstr_t &text)
@@ -86,7 +122,8 @@ bool Client::run()
 	if (!what)
 		return true;
 
-	//VERBOSE(*what);
+	*(m_log->get()) << *what << std::endl;
+
 	NetworkEvent e;
 
 	// Extract regular text if available
@@ -184,7 +221,8 @@ void Client::handleClientEvent(cstr_t &status, NetworkEvent *e)
 		UserInstance *ui = c->addUser(e->nickname);
 		ui->hostmask = e->hostmask;
 
-		m_module_mgr->onUserJoin(c, ui);
+		if (e->nickname != m_nickname)
+			m_module_mgr->onUserJoin(c, ui);
 	}
 	if (status == "MODE") {
 		cstr_t &what = e->args[2];
@@ -195,6 +233,31 @@ void Client::handleClientEvent(cstr_t &status, NetworkEvent *e)
 			return;
 		}
 
+		UserInstance *ui = m_network->getUser(what);
+		if (!ui) {
+			WARN("MODE not implemented for " << what);
+			return;
+		}
+
+		// Add and remove user modes
+		bool add = (e->text[0] != '-');
+		for (char c : e->text) {
+			if (c == '+' || c == '-')
+				continue;
+
+			char *pos = strchr(ui->modes, c);
+			if (add == (pos != nullptr))
+				continue; // Nothing to changed
+
+			if (add) {
+				pos = strchr(ui->modes, ' ');
+				if (pos)
+					*pos = c;
+			} else {
+				*pos = ' ';
+			}
+		}
+
 		if (what == m_nickname) {
 			// Our mode updated. Auth, if not already done.
 			if (m_auth_status == AS_AUTHENTICATE) {
@@ -202,18 +265,17 @@ void Client::handleClientEvent(cstr_t &status, NetworkEvent *e)
 					send("PRIVMSG NickServ :identify " + m_settings->get("client.password"));
 			}
 
-			if (strchr(modes.c_str(), 'r'))
+			if (strchr(ui->modes, 'r'))
 				m_auth_status = AS_JOIN_CHANNELS;
 		}
 		return;
 	}
 	if (status == "PART" || status == "KICK") {
 		cstr_t &channel = e->args[2];
-		Channel *c = m_network->addChannel(channel);
-
+		Channel *c = m_network->getChannel(channel);
 		UserInstance *ui = c->getUser(e->nickname);
-		if (!ui) {
-			ERROR("Unknown user: " << e->nickname);
+		if (!c || !ui) {
+			ERROR("Invalid channel or user");
 			return;
 		}
 
@@ -259,9 +321,8 @@ void Client::handleClientEvent(cstr_t &status, NetworkEvent *e)
 void Client::handleChatMessage(cstr_t &status, NetworkEvent *e)
 {
 	// Log this line
-	std::time_t time = std::time(nullptr);
-	std::tm *tm = std::localtime(&time);
-	std::cout << std::put_time(tm, "[%T]") << " ";
+	write_timestamp(&std::cout);
+	std::cout << " ";
 	if (!e->nickname.empty() && e->nickname != m_nickname)
 		std::cout << e->nickname << " \t";
 
@@ -303,7 +364,7 @@ void Client::handleChatMessage(cstr_t &status, NetworkEvent *e)
 
 		ICallbackHandler::ChatInfo info;
 		info.ui = m_network->getUser(e->nickname);
-		info.parts = strsplit(e->text);
+		info.text = e->text;
 		m_module_mgr->onUserSay(c, info);
 		return;
 	}
@@ -311,7 +372,7 @@ void Client::handleChatMessage(cstr_t &status, NetworkEvent *e)
 
 void Client::handlePing(cstr_t &status, NetworkEvent *e)
 {
-	VERBOSE("PONG!");
+	//VERBOSE("PONG!");
 	send("PONG " + e->text);
 }
 
@@ -328,6 +389,8 @@ void Client::handleAuthentication(cstr_t &status, NetworkEvent *e)
 			m_auth_status = AS_AUTHENTICATE;
 		else
 			m_auth_status = AS_JOIN_CHANNELS;
+
+		m_network->addUser(m_nickname);
 		return;
 	}
 	if (status == "396") {
@@ -344,6 +407,7 @@ void Client::handleServerMessage(cstr_t &status, NetworkEvent *e)
 
 	int status_i = 0;
 	sscanf(status.c_str(), "%i", &status_i);
+
 	if (status_i == 353) {
 		// User list
 		cstr_t &channel = e->args[4];
@@ -355,9 +419,9 @@ void Client::handleServerMessage(cstr_t &status, NetworkEvent *e)
 			if (strchr("~&@%+", name[0]))
 				name = name.substr(1);
 
-			UserInstance *ui = c->addUser(name);
-			m_module_mgr->onUserJoin(c, ui);
+			c->addUser(name);
 		}
+		m_module_mgr->onChannelJoin(c);
 		return;
 	}
 }

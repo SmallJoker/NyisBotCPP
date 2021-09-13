@@ -59,7 +59,7 @@ void Settings::set(cstr_t &key, cstr_t &value)
 		return;
 	}
 
-	MutexAutoLock _(m_lock);
+	MutexLock _(m_lock);
 
 	std::string keyp = KEY_RAW(key);
 	m_modified.insert(keyp);
@@ -82,7 +82,7 @@ void Settings::set(cstr_t &key, SettingType *type)
 bool Settings::remove(cstr_t &key)
 {
 	std::string keyp = KEY_RAW(key);
-	MutexAutoLock _(m_lock);
+	MutexLock _(m_lock);
 
 	auto it = m_settings.find(keyp);
 	if (it == m_settings.end())
@@ -96,7 +96,7 @@ bool Settings::remove(cstr_t &key)
 
 bool Settings::syncFileContents()
 {
-	MutexAutoLock _(m_lock);
+	MutexLock _(m_lock);
 
 	std::ifstream is(m_file);
 	if (!is.good()) {
@@ -143,7 +143,7 @@ bool Settings::syncFileContents()
 				break;
 			}
 
-			std::string key = trim(line.substr(0, pos - 1));
+			std::string key = strtrim(line.substr(0, pos - 1));
 			if (!is_valid_key(key)) {
 				WARN("Invalid key '" << key << " in line " << line_n);
 				break;
@@ -173,7 +173,7 @@ bool Settings::syncFileContents()
 			}
 
 			// Read and keep value if the prefix matches
-			std::string value = trim(line.substr(pos + 1));
+			std::string value = strtrim(line.substr(pos + 1));
 			m_settings[key] = value;
 			line_status = LS_KEEP; // Use line as-is
 		} while (false);

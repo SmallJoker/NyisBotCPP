@@ -12,14 +12,12 @@ if(NOT MSVC)
 	#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
 endif()
 
-add_library(nbm_builtin SHARED
-	builtin.cpp
-)
-target_link_libraries(nbm_builtin
-	PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/../libNyisBotCPP.so"
-)
+function(my_add_module)
+	add_library(${ARGV0} SHARED "${ARGV0}.cpp")
+	target_link_libraries(${ARGV0}
+		PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/../libNyisBotCPP.so"
+	)
+endfunction()
 
-add_library(nbm_timebomb SHARED
-	timebomb.cpp
-)
-#target_link_libraries(nbm_timebomb NyisBotCPP)
+my_add_module("nbm_builtin")
+my_add_module("nbm_timebomb")

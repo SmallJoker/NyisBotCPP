@@ -49,6 +49,8 @@ ModuleMgr::ModuleMgr(Client *cli)
 {
 	m_client = cli;
 	m_commands = new ChatCommand(nullptr);
+
+	m_last_step = std::chrono::high_resolution_clock::now();
 }
 
 ModuleMgr::~ModuleMgr()
@@ -204,6 +206,22 @@ Settings *ModuleMgr::getSettings(IModule *module) const
 		return nullptr;
 
 	return new Settings("config/modules.conf", nullptr, mi->name);
+}
+
+void ModuleMgr::onStep(float time)
+{
+	MutexLock _(m_lock);
+
+	auto time_now = std::chrono::high_resolution_clock::now();
+	time = std::chrono::duration<float>(time_now - m_last_step).count();
+
+	if (time < 0.2f)
+		return;
+
+	m_last_step = time_now;
+
+	for (ModuleInternal *mi : m_modules)
+		mi->module->onStep(time);
 }
 
 void ModuleMgr::onChannelJoin(Channel *c)

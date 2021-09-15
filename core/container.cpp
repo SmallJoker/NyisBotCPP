@@ -8,13 +8,13 @@ Containers::~Containers()
 	}
 }
 
-bool Containers::add(const void *owner, IContainer *data)
+void Containers::set(const void *owner, IContainer *data)
 {
-	if (get(owner))
-		return false;
+	IContainer *existing = get(owner);
+	if (existing != data)
+		delete existing;
 
 	m_data.insert({owner, data});
-	return true;
 }
 
 IContainer *Containers::get(const void *owner) const

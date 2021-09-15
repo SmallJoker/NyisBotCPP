@@ -9,7 +9,7 @@ class ChatCommand;
 class UserInstance;
 
 #define CHATCMD_FUNC(name) \
-	bool (name)(Channel *c, UserInstance *ui, std::string msg)
+	void (name)(Channel *c, UserInstance *ui, std::string msg)
 
 typedef CHATCMD_FUNC(IModule::*ChatCommandAction);
 

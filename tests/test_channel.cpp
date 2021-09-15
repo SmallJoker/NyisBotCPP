@@ -38,11 +38,11 @@ void test_Network_Channel_UserInstance()
 	{
 		UserInstance *ui_d = c->addUser("Donald");
 		TEST_CHECK(c->addUser("Donald") == ui_d);
-		ui_d->add(nullptr, new RefContainer());
+		ui_d->set(nullptr, new RefContainer());
 
 		TEST_CHECK(c->getUser("Mickey") == nullptr);
 		UserInstance *ui_m = c->addUser("Mickey");
-		ui_m->add(nullptr, new RefContainer());
+		ui_m->set(nullptr, new RefContainer());
 
 		TEST_CHECK(c->removeUser(ui_m) == true);
 		// Reference is still held by Network

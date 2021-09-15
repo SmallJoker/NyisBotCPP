@@ -55,8 +55,7 @@ public:
 	Settings *getSettings(IModule *module) const;
 
 	// Callback handlers
-	void onClientReady() {}
-	void onModuleUnload() {}
+	void onStep(float time);
 	void onChannelJoin(Channel *c);
 	void onChannelLeave(Channel *c);
 	void onUserJoin(Channel *c, UserInstance *ui);
@@ -66,6 +65,7 @@ public:
 private:
 	bool loadSingleModule(cstr_t &module_name, cstr_t &path);
 
+	std::chrono::high_resolution_clock::time_point m_last_step;
 	std::mutex m_lock;
 	std::set<ModuleInternal *> m_modules;
 	ChatCommand *m_commands = nullptr;

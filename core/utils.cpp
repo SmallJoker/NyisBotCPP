@@ -79,6 +79,17 @@ bool is_yes(std::string what)
 	return (what == "true" || what == "yes" || what == "on" || what == "enabled");
 }
 
+int get_random()
+{
+	static thread_local bool init = false;
+	if (!init) {
+		srand(time(nullptr));
+		init = true;
+	}
+
+	return rand();
+}
+
 void apply_user_modes(char *buf, const std::string &modifier)
 {
 	bool add = (modifier[0] != '-');

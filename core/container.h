@@ -12,6 +12,7 @@ public:
 	virtual ~ICallbackHandler() {}
 
 	virtual void onModuleUnload() {}
+	virtual void onStep(float time) {}
 	virtual void onChannelJoin(Channel *c) {}
 	virtual void onChannelLeave(Channel *c) {}
 	virtual void onUserJoin(Channel *c, UserInstance *ui) {}
@@ -30,7 +31,8 @@ class Containers {
 public:
 	~Containers();
 
-	bool add(const void *owner, IContainer *data);
+	// Adds a new or replaces an existing container
+	void set(const void *owner, IContainer *data);
 	IContainer *get(const void *owner) const;
 	bool remove(const void *owner);
 	bool move(const void *old_owner, const void *new_owner);

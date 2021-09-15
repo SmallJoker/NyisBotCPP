@@ -60,17 +60,26 @@ void ChatCommand::remove(IModule *module)
 
 bool ChatCommand::run(Channel *c, UserInstance *ui, std::string &msg) const
 {
-	bool run = false;
+	// Main command
+	if (m_module && (msg.empty() || m_subs.empty())) {
+		(m_module->*m_action)(c, ui, msg);
+		return true;
+	}
+
 	std::string cmd(get_next_part(msg));
 
 	auto it = m_subs.find(cmd);
-	if (it != m_subs.end())
-		run = it->second.run(c, ui, msg);
+	if (it != m_subs.end()) {
+		it->second.run(c, ui, msg);
+		return true;
+	}
 
 	// Show help function if available
-	if (!run)
-		run = m_module && (m_module->*m_action)(c, ui, msg);
-	return run;
+	if (m_module) {
+		(m_module->*m_action)(c, ui, msg);
+		return true;
+	}
+	return false;
 }
 
 std::string ChatCommand::getList() const

@@ -114,8 +114,11 @@ bool Client::run()
 		return false;
 	}
 
-	std::unique_ptr<std::string> what(m_con->popRecv());
 	// Process incoming lines, one-by-one
+	std::unique_ptr<std::string> what(m_con->popRecv());
+
+	m_module_mgr->onStep(0);
+
 	if (!what)
 		return true;
 

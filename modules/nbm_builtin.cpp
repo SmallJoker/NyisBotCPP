@@ -83,6 +83,15 @@ public:
 			sendRaw("QUIT :Goodbye!");
 			return true;
 		}
+		if (cmd == "$list") {
+			std::string list("List: ");
+			for (UserInstance *ui : c->getAllUsers()) {
+				list.append(ui->nickname);
+				list.append("_");
+			}
+			c->say(list);
+			return true;
+		}
 
 		return false;
 	}
@@ -93,8 +102,7 @@ public:
 		// ^ for subcommand help
 
 		c->say("Available commands: " + m_commands->getList() +
-			"$reload <module> [<keep>], $quit");
-		return true;
+			" $reload <module> [<keep>], $quit");
 	}
 
 	CHATCMD_FUNC(cmd_remember)
@@ -105,7 +113,7 @@ public:
 		if (!bc) {
 			bc = new BuiltinContainer();
 			bc->remember_text = m_settings->get(ui->nickname);
-			ui->add(this, bc);
+			ui->set(this, bc);
 		}
 
 		if (what.empty()) {
@@ -116,8 +124,6 @@ public:
 			bc->remember_text = what;
 			c->say("Saved!");
 		}
-
-		return true;
 	}
 
 	CHATCMD_FUNC(cmd_setting)
@@ -126,20 +132,19 @@ public:
 		if (cmd == "set") {
 			std::string key(get_next_part(msg));
 			m_settings->set(key, strtrim(msg));
-			return true;
+			return;
 		}
 		if (cmd == "get") {
 			std::string key(get_next_part(msg));
 			c->say(ui->nickname + ": " + m_settings->get(key));
-			return true;
+			return;
 		}
 		if (cmd == "save") {
 			onModuleUnload();
-			return true;
+			return;
 		}
 
 		c->say("Available commands: set, get, save");
-		return true;
 	}
 
 private:

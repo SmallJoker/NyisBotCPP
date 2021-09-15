@@ -1,5 +1,6 @@
 #include "test.h"
 #include "../core/logger.h"
+#include <iostream>
 
 Unittest::Unittest()
 {

@@ -1,7 +1,11 @@
 #include "logger.h"
 #include <fstream>
 #include <iomanip> // std::put_time
+#include <iostream> // cout
+#include <sstream>
 #include <time.h> // sleep_ms
+
+Logger *g_logger = nullptr;
 
 void sleep_ms(long long ms)
 {
@@ -30,6 +34,7 @@ Logger::Logger(const char *filename)
 {
 	std::ofstream *os = new std::ofstream(filename, std::ios::out | std::ios::trunc);
 	m_file = os;
+	m_sink = new std::ostringstream();
 
 	*os << "====> Logging started: ";
 	write_datetime(os);
@@ -40,4 +45,59 @@ Logger::~Logger()
 {
 	m_file->flush();
 	delete m_file;
+	delete m_sink;
+}
+
+std::ostream &Logger::getStdout(LogLevel level)
+{
+	if (level >= m_loglevel_stdout)
+		return std::cout;
+
+	m_sink->clear();
+	return *m_sink;
+}
+
+std::ostream &Logger::getFile(LogLevel level)
+{
+	if (level >= m_loglevel_file)
+		return *m_file;
+
+	m_sink->clear();
+	return *m_sink;
+}
+
+static const struct {
+	const char *text;
+	const char *terminal_fmt;
+} s_format[LL_INVALID] = {
+	{ " verbose ", "\e[1;30m" },
+	{ "         ", "\e[0;36m" },
+	{ " WARNING ", "\e[1;33m" },
+	{ "  ERROR  ", "\e[0;31m" },
+};
+
+LoggerAssistant::LoggerAssistant(LogLevel level, const char *func)
+{
+	m_level = level;
+
+	std::ostringstream oss;
+	write_timestamp(&oss);
+	*this << oss.str();
+
+	g_logger->getStdout(m_level) << s_format[(int)level].terminal_fmt;
+
+	*this << s_format[(int)level].text;
+	if (func)
+		*this << func;
+
+	g_logger->getStdout(m_level) << "\e[0m";
+
+	if (func)
+		*this  << ": ";
+}
+
+LoggerAssistant::~LoggerAssistant()
+{
+	g_logger->getStdout(m_level) << std::endl;
+	g_logger->getFile(m_level)   << std::endl;
 }

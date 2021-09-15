@@ -7,6 +7,7 @@
 #include "module.h"
 #include "settings.h"
 #include <cstring>
+#include <iostream>
 #include <memory> // unique_ptr
 
 struct ClientActionEntry {
@@ -35,7 +36,6 @@ Client::Client(Settings *settings)
 {
 	m_settings = settings;
 
-	m_log = new Logger("debug.txt");
 	m_network = new Network(this);
 	m_module_mgr = new ModuleMgr(this);
 }
@@ -55,9 +55,6 @@ Client::~Client()
 
 	delete m_con;
 	m_con = nullptr;
-
-	delete m_log;
-	m_log = nullptr;
 }
 
 void Client::initialize()
@@ -122,7 +119,7 @@ bool Client::run()
 	if (!what)
 		return true;
 
-	*(m_log->get()) << *what << std::endl;
+	g_logger->getFile(LL_NORMAL) << *what << std::endl;
 
 	NetworkEvent e;
 

@@ -1,23 +1,22 @@
 #pragma once
 
-#include <iostream> // cout
+#include <ostream>
 
 #define VERBOSE(str) \
-	std::cout << "\e[1;30m" << __PRETTY_FUNCTION__ << "\e[0m: " << str << std::endl
+	LoggerAssistant(LL_VERBOSE, __PRETTY_FUNCTION__) << str
 
 #define LOG(str) \
-	std::cout << "\e[0;36m" << __PRETTY_FUNCTION__ << "\e[0m: " << str << std::endl
+	LoggerAssistant(LL_NORMAL,  __PRETTY_FUNCTION__) << str
 
 #define WARN(str) \
-	std::cout << "\e[1;33m" << __PRETTY_FUNCTION__ << "\e[0m: " << str << std::endl
+	LoggerAssistant(LL_WARNING, __PRETTY_FUNCTION__) << str
 
 #define ERROR(str) \
-	std::cout << "\e[0;31m" << __PRETTY_FUNCTION__ << "\e[0m: " << str << std::endl
+	LoggerAssistant(LL_ERROR,   __PRETTY_FUNCTION__) << str
 
 #define ASSERT(expr, msg) \
 	if (!(expr)) { \
-		std::cout << "\e[0;31m" << __PRETTY_FUNCTION__ << "\e[0m: Assertion " \
-			<< #expr << ": " << msg << std::endl; \
+		ERROR("Assertion " << #expr << ": " << msg); \
 		throw std::string("Assertion failed"); \
 	}
 
@@ -27,14 +26,53 @@ void sleep_ms(long long ms);
 void write_timestamp(std::ostream *os);
 void write_datetime(std::ostream *os);
 
+
+enum LogLevel {
+	LL_VERBOSE,
+	LL_NORMAL,
+	LL_WARNING,
+	LL_ERROR,
+	LL_INVALID
+};
+
+class Logger;
+extern Logger *g_logger;
+
 class Logger {
 public:
 	Logger(const char *filename);
 	~Logger();
 
-	std::ostream *get() const
-	{ return m_file; }
+	void setLogLevels(LogLevel ll_stdout, LogLevel ll_file)
+	{
+		m_loglevel_stdout = ll_stdout;
+		m_loglevel_file = ll_file;
+	}
+
+	std::ostream &getStdout(LogLevel level);
+	std::ostream &getFile(LogLevel level);
 
 private:
+	std::ostream *m_sink;
 	std::ostream *m_file;
+	LogLevel m_loglevel_stdout = LL_VERBOSE;
+	LogLevel m_loglevel_file = LL_VERBOSE;
 };
+
+class LoggerAssistant {
+public:
+	LoggerAssistant(LogLevel level = LL_NORMAL, const char *func = nullptr);
+	~LoggerAssistant();
+
+	template <typename T>
+	LoggerAssistant &operator<<(const T &what)
+	{
+		g_logger->getStdout(m_level) << what;
+		g_logger->getFile(m_level) << what;
+		return *this;
+	}
+
+private:
+	LogLevel m_level;
+};
+

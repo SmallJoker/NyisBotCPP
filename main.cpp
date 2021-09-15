@@ -9,8 +9,9 @@ static Client *s_cli = nullptr;
 
 void exit_main()
 {
-	LOG("Destructing..");
+	LOG("Shutting down...");
 	delete s_cli;
+	delete g_logger;
 	SLEEP_MS(100);
 }
 
@@ -18,6 +19,9 @@ extern "C" {
 
 DLL_EXPORT int main()
 {
+	g_logger = new Logger("debug.txt");
+	g_logger->setLogLevels(LL_VERBOSE, LL_NORMAL);
+
 	LOG("Startup");
 
 	if (0) {
@@ -48,7 +52,7 @@ DLL_EXPORT int main()
 	s_cli = new Client(&settings_rw);
 	if (!s_cli->getModuleMgr()->loadModules())
 		exit(EXIT_FAILURE);
-
+#if 0
 	s_cli->initialize();
 	s_cli->sendRaw("PING server");
 
@@ -56,9 +60,7 @@ DLL_EXPORT int main()
 		s_cli->processTodos();
 		SLEEP_MS(20);
 	}
-
-	delete s_cli;
-	s_cli = nullptr;
+#endif
 	return 0;
 }
 

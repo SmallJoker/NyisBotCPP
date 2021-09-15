@@ -20,8 +20,6 @@ private:
 	bool parseFloat(const char *str);
 	bool parseString(const char *str);
 
-	std::string m_prefix;
-
 	union {
 		bool *b;
 		long *l;

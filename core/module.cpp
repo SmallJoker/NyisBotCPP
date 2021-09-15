@@ -144,6 +144,9 @@ bool ModuleMgr::reloadModule(std::string name, bool keep_data)
 
 void ModuleMgr::unloadModules()
 {
+	if (m_modules.empty())
+		return;
+
 	LOG("Unloading modules...");
 
 	Network *net = m_client ? m_client->getNetwork() : nullptr;

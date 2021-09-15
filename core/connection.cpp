@@ -53,9 +53,9 @@ Connection::~Connection()
 bool Connection::send(cstr_t &data)
 {
 	if (data.size() < 255)
-		LOG("<< Sending: " << strtrim(data));
+		VERBOSE("<< Sending: " << strtrim(data));
 	else
-		LOG("<< Sending " << data.size() << " bytes");
+		VERBOSE("<< Sending " << data.size() << " bytes");
 
 	CURLcode res;
 	int retries = 0;

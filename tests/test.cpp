@@ -7,6 +7,8 @@ Unittest::Unittest()
 	// === Register tests ====
 	void test_Utils(Unittest *t);
 	test_Utils(this);
+	void test_Chatcommand(Unittest *t);
+	test_Chatcommand(this);
 	void test_Module(Unittest *t);
 	test_Module(this);
 	void test_Settings(Unittest *t);
@@ -22,11 +24,13 @@ void Unittest::addTest(const char *name, func_void_t func)
 	m_list.push_back({ name, func });
 }
 
+int Unittest::num_checked = 0;
+int Unittest::num_passed = 0;
 
 bool Unittest::runTests()
 {
-	int num_ok = 0,
-		num_run = 0;
+	num_checked = 0;
+	num_passed = 0;
 
 	std::cout << "\n===> Unittests started\n" << std::endl;
 
@@ -35,15 +39,13 @@ bool Unittest::runTests()
 
 		try {
 			test.func();
-			num_ok++;
 		} catch (std::string e) {
 			std::cout << "\tFAIL: " << e << std::endl;
 		} catch (std::exception e) {
 			std::cout << "\tFAIL: " << e.what() << std::endl;
 		}
-		num_run++;
 	}
-	std::cout << "\n===> Done. " << num_ok << " / " << num_run << " passed!\n" << std::endl;
+	std::cout << "\n===> Done. " << num_passed << " / " << num_checked << " passed!\n" << std::endl;
 
-	return num_run == num_ok;
+	return num_passed == num_checked;
 }

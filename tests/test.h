@@ -4,9 +4,10 @@
 #include <exception>
 
 #define TEST_CHECK(expr) \
-	if (!(expr)) { \
+	{ Unittest::num_checked++; \
+	if (!(expr)) \
 		throw std::string("Failed: " #expr); \
-	}
+	Unittest::num_passed++; }
 
 #define TEST_REGISTER(func) \
 	ut->addTest(#func, func);
@@ -22,6 +23,7 @@ public:
 	bool runTests();
 	void addTest(const char *name, func_void_t func);
 
+	static int num_checked, num_passed;
 private:
 	struct Entry {
 		const char *name;

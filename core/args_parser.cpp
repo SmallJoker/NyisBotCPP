@@ -1,8 +1,8 @@
 #include "args_parser.h"
 #include "logger.h"
-#include <vector>
+#include <map>
 
-std::vector<CLIArg *> g_args;
+std::map<std::string, CLIArg *> g_args;
 
 CLIArg::CLIArg(cstr_t &pfx, bool *out) : CLIArg(pfx)
 {
@@ -30,37 +30,36 @@ CLIArg::CLIArg(cstr_t &pfx, std::string *out) : CLIArg(pfx)
 
 CLIArg::CLIArg(cstr_t &pfx)
 {
-	m_prefix = "--" + pfx;
-	g_args.emplace_back(this);
+	g_args.insert({"--" + pfx, this});
 }
 
 static const std::string HELPCMD("--help");
 
 void CLIArg::parseArgs(int argc, char **argv)
 {
-	for (int i = 0; i < argc; ++i) {
-		for (CLIArg *a : g_args) {
-			if (argv[i] == HELPCMD) {
-				showHelp();
-				exit(EXIT_SUCCESS);
-			}
-
-			if (a->m_prefix != argv[i])
-				continue;
-
-			if (a->m_handler == &CLIArg::parseFlag) {
-				// Single
-				(a->*a->m_handler)(nullptr);
-				break;
-			}
-
-			if (i + 1 < argc && (a->*a->m_handler)(argv[i + 1]))
-				++i;
-			else
-				WARN("Cannot parse argument '" << argv[i] << "'");
-
-			break;
+	for (int i = 1; i < argc; ++i) {
+		if (argv[i] == HELPCMD) {
+			showHelp();
+			exit(EXIT_SUCCESS);
 		}
+
+		auto it = g_args.find(argv[i]);
+		if (it == g_args.end()) {
+			WARN("Unknown argument '" << argv[i] << "'");
+			continue;
+		}
+
+		bool has_argv = (it->second->m_handler != &CLIArg::parseFlag);
+		bool ok = (i + 1 < argc) || !has_argv;
+		if (ok) {
+			// Note: argv is NULL-terminated
+			ok = (it->second->*(it->second)->m_handler)(argv[i + 1]);
+			if (ok && has_argv)
+				i++;
+		}
+
+		if (!ok)
+			WARN("Cannot parse argument '" << argv[i] << "'");
 	}
 	g_args.clear();
 }
@@ -70,7 +69,8 @@ void CLIArg::showHelp()
 	LoggerAssistant la(LL_NORMAL);
 	la << "Available commands:\n";
 
-	for (CLIArg *a : g_args) {
+	for (const auto &it : g_args) {
+		const CLIArg *a = it.second;
 		const char *type = "invalid";
 		std::string initval;
 
@@ -87,7 +87,7 @@ void CLIArg::showHelp()
 			type = "string";
 			initval = '"' + *a->m_dst.s + '"';
 		}
-		la << "\t" << a->m_prefix << "\t (Type: " << type;
+		la << "\t" << it.first << "\t (Type: " << type;
 		if (!initval.empty())
 			la << ", Default: " << initval;
 		la << ")\n";

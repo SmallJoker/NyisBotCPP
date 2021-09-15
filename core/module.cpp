@@ -1,5 +1,6 @@
 
 #include "channel.h"
+#include "chatcommand.h"
 #include "client.h"
 #include "logger.h"
 #include "module.h"
@@ -44,9 +45,16 @@ void IModule::sendRaw(cstr_t &what) const
 
 // ================= ModuleMgr =================
 
+ModuleMgr::ModuleMgr(Client *cli)
+{
+	m_client = cli;
+	m_commands = new ChatCommand(nullptr);
+}
+
 ModuleMgr::~ModuleMgr()
 {
 	unloadModules();
+	delete m_commands;
 }
 
 bool ModuleMgr::loadModules()
@@ -115,10 +123,14 @@ bool ModuleMgr::reloadModule(std::string name, bool keep_data)
 	Network *net = m_client ? m_client->getNetwork() : nullptr;
 	IModule *expired_ptr = mi->module;
 
+	// Remove all invalid module-registered commands
+	m_commands->remove(mi->module);
+
 	mi->unload(keep_data ? nullptr : net);
 	bool ok = mi->load(m_client);
 
 	if (ok) {
+		mi->module->initCommands(*m_commands);
 		if (m_client)
 			mi->module->onClientReady();
 	} else {
@@ -155,6 +167,8 @@ void ModuleMgr::unloadModules()
 		delete mi;
 	}
 	m_modules.clear();
+
+	*m_commands = ChatCommand(nullptr); // reset
 }
 
 bool ModuleMgr::loadSingleModule(cstr_t &module_name, cstr_t &path)
@@ -167,6 +181,7 @@ bool ModuleMgr::loadSingleModule(cstr_t &module_name, cstr_t &path)
 	if (ok) {
 		m_modules.insert(mi);
 
+		mi->module->initCommands(*m_commands);
 		if (m_client)
 			mi->module->onClientReady();
 	} else {
@@ -226,11 +241,19 @@ void ModuleMgr::onUserRename(UserInstance *ui, cstr_t &old_name)
 		mi->module->onUserRename(ui, old_name);
 }
 
-bool ModuleMgr::onUserSay(Channel *c, ChatInfo info)
+bool ModuleMgr::onUserSay(Channel *c, UserInstance *ui, std::string &msg)
 {
 	MutexLock _(m_lock);
+
+	std::string backup(msg);
+	if (m_commands->run(c, ui, msg))
+		return true;
+
 	for (ModuleInternal *mi : m_modules) {
-		if (mi->module->onUserSay(c, info))
+		if (msg.size() != backup.size())
+			msg.assign(backup);
+
+		if (mi->module->onUserSay(c, ui, msg))
 			return true;
 	}
 	return false;

@@ -12,6 +12,7 @@
 
 
 class Channel;
+class ChatCommand;
 class Client;
 class ModuleMgr;
 class Network;
@@ -22,6 +23,8 @@ struct ModuleInternal;
 class IModule : public ICallbackHandler {
 public:
 	virtual ~IModule() {}
+	virtual void initCommands(ChatCommand &cmd) {}
+	virtual void onClientReady() {}
 
 	cstr_t &getModulePath()
 	{ return *m_path; }
@@ -43,8 +46,7 @@ private:
 
 class ModuleMgr : public ICallbackHandler {
 public:
-	ModuleMgr(Client *cli) :
-		m_client(cli) {}
+	ModuleMgr(Client *cli);
 	~ModuleMgr();
 
 	bool loadModules();
@@ -60,11 +62,12 @@ public:
 	void onUserJoin(Channel *c, UserInstance *ui);
 	void onUserLeave(Channel *c, UserInstance *ui);
 	void onUserRename(UserInstance *ui, cstr_t &old_name);
-	bool onUserSay(Channel *c, ChatInfo info);
+	bool onUserSay(Channel *c, UserInstance *ui, std::string &msg);
 private:
 	bool loadSingleModule(cstr_t &module_name, cstr_t &path);
 
 	std::mutex m_lock;
 	std::set<ModuleInternal *> m_modules;
+	ChatCommand *m_commands = nullptr;
 	Client *m_client;
 };

@@ -11,19 +11,13 @@ class ICallbackHandler {
 public:
 	virtual ~ICallbackHandler() {}
 
-	struct ChatInfo {
-		UserInstance *ui;
-		std::string text;
-	};
-
-	virtual void onClientReady() {}
 	virtual void onModuleUnload() {}
 	virtual void onChannelJoin(Channel *c) {}
 	virtual void onChannelLeave(Channel *c) {}
 	virtual void onUserJoin(Channel *c, UserInstance *ui) {}
 	virtual void onUserLeave(Channel *c, UserInstance *ui) {}
 	virtual void onUserRename(UserInstance *ui, const std::string &old_name) {}
-	virtual bool onUserSay(Channel *c, ChatInfo info) { return false; }
+	virtual bool onUserSay(Channel *c, UserInstance *ui, std::string &msg) { return false; }
 };
 
 

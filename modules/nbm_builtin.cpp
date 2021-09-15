@@ -1,4 +1,5 @@
 #include "../core/channel.h"
+#include "../core/chatcommand.h"
 #include "../core/logger.h"
 #include "../core/module.h"
 #include "../core/settings.h"
@@ -19,6 +20,13 @@ public:
 		if (m_settings)
 			m_settings->syncFileContents();
 		delete m_settings;
+	}
+
+	void initCommands(ChatCommand &cmd)
+	{
+		m_chatcommands = &cmd;
+		cmd.add("$help",     (ChatCommandAction)&nbm_builtin::cmd_help,     this);
+		cmd.add("$remember", (ChatCommandAction)&nbm_builtin::cmd_remember, this);
 	}
 
 	void onClientReady()
@@ -56,53 +64,28 @@ public:
 
 	virtual void onUserRename(UserInstance *ui, cstr_t &old_name) {}
 
-	bool onUserSay(Channel *c, ChatInfo info)
+	bool onUserSay(Channel *c, UserInstance *ui, std::string &msg)
 	{
-		std::string cmd(get_next_part(info.text));
+		std::string cmd(get_next_part(msg));
 		if (cmd.size() < 2 || cmd[0] != '$')
 			return false;
 
-		if (cmd == "$help") {
-			c->say("Available commands: $reload <module> <keep>, $remember [<text ...>]");
-			return true;
-		}
 		if (cmd == "$reload") {
-			std::string module(get_next_part(info.text));
-			std::string keep(get_next_part(info.text));
+			std::string module(get_next_part(msg));
+			std::string keep(get_next_part(msg));
 
 			getModuleMgr()->reloadModule(module, is_yes(keep));
-			c->say(info.ui->nickname + ": Enqueued!");
-			return true;
-		}
-		if (cmd == "$remember") {
-			std::string what(strtrim(info.text));
-
-			BuiltinContainer *bc = (BuiltinContainer *)info.ui->data->get(this);
-			if (!bc) {
-				bc = new BuiltinContainer();
-				bc->remember_text = m_settings->get(info.ui->nickname);
-				info.ui->data->add(this, bc);
-			}
-
-			if (what.empty()) {
-				// Retrieve remembered text
-				c->say(bc->remember_text);
-			} else {
-				// Save text
-				bc->remember_text = what;
-				c->say("Saved!");
-			}
-
+			c->say(ui->nickname + ": Enqueued!");
 			return true;
 		}
 		if (cmd == "$set") {
-			std::string key(get_next_part(info.text));
-			m_settings->set(key, strtrim(info.text));
+			std::string key(get_next_part(msg));
+			m_settings->set(key, strtrim(msg));
 			return true;
 		}
 		if (cmd == "$get") {
-			std::string key(get_next_part(info.text));
-			c->say(info.ui->nickname + ": " + m_settings->get(key));
+			std::string key(get_next_part(msg));
+			c->say(ui->nickname + ": " + m_settings->get(key));
 			return true;
 		}
 		if (cmd == "$save") {
@@ -117,8 +100,38 @@ public:
 		return false;
 	}
 
+	CHATCMD_FUNC(cmd_help)
+	{
+		c->say("Available commands: " + m_chatcommands->getList());
+		return true;
+	}
+
+	CHATCMD_FUNC(cmd_remember)
+	{
+		std::string what(strtrim(msg));
+
+		BuiltinContainer *bc = (BuiltinContainer *)ui->data->get(this);
+		if (!bc) {
+			bc = new BuiltinContainer();
+			bc->remember_text = m_settings->get(ui->nickname);
+			ui->data->add(this, bc);
+		}
+
+		if (what.empty()) {
+			// Retrieve remembered text
+			c->say(bc->remember_text);
+		} else {
+			// Save text
+			bc->remember_text = what;
+			c->say("Saved!");
+		}
+
+		return true;
+	}
+
 private:
 	Settings *m_settings = nullptr;
+	ChatCommand *m_chatcommands = nullptr;
 };
 
 extern "C" {

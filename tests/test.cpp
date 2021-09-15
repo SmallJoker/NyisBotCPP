@@ -25,12 +25,11 @@ void Unittest::addTest(const char *name, func_void_t func)
 }
 
 int Unittest::num_checked = 0;
-int Unittest::num_passed = 0;
 
 bool Unittest::runTests()
 {
+	int num_run = 0, num_pass = 0;
 	num_checked = 0;
-	num_passed = 0;
 
 	std::cout << "\n===> Unittests started\n" << std::endl;
 
@@ -39,13 +38,16 @@ bool Unittest::runTests()
 
 		try {
 			test.func();
+			num_pass++;
 		} catch (std::string e) {
 			std::cout << "\tFAIL: " << e << std::endl;
 		} catch (std::exception e) {
 			std::cout << "\tFAIL: " << e.what() << std::endl;
 		}
+		num_run++;
 	}
-	std::cout << "\n===> Done. " << num_passed << " / " << num_checked << " passed!\n" << std::endl;
+	std::cout << "\n===> Done. " << num_pass << " / " << num_run << " passed. "
+		<< "Ran " << num_checked << " checks.\n" << std::endl;
 
-	return num_passed == num_checked;
+	return num_pass == num_run;
 }

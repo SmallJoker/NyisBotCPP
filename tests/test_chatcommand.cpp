@@ -35,11 +35,14 @@ void test_Chatcommand_simple()
 	{
 		ChatCommand cmd(&mymod);
 		mymod.setupCommands(cmd);
+		TEST_CHECK(cmd.getList().size() > 0);
 
 		TEST_CHECK(cmd.run(nullptr, nullptr, msg) == false);
 		msg = "!help";
 		TEST_CHECK(cmd.run(nullptr, nullptr, msg) == true);
 		TEST_CHECK(call_counter == 1);
+		cmd.remove(&mymod);
+		TEST_CHECK(cmd.getList().size() == 0);
 	}
 	{
 		ChatCommand cmd(&mymod);

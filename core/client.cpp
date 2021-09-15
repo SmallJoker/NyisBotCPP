@@ -353,10 +353,7 @@ void Client::handleChatMessage(cstr_t &status, NetworkEvent *e)
 			c = m_network->addChannel(channel);
 		}
 
-		ICallbackHandler::ChatInfo info;
-		info.ui = m_network->getUser(e->nickname);
-		info.text = e->text;
-		m_module_mgr->onUserSay(c, info);
+		m_module_mgr->onUserSay(c, m_network->getUser(e->nickname), e->text);
 		return;
 	}
 }

@@ -8,27 +8,46 @@ ChatCommand::ChatCommand(IModule *module)
 	m_module = module;
 }
 
-void ChatCommand::add(cstr_t &subcmd)
+void ChatCommand::add(cstr_t &subcmd, ChatCommandAction action, IModule *module)
 {
-	auto [it, is_new] = m_subs.insert({subcmd, ChatCommand(m_module)});
-
-	if (!is_new)
-		WARN("Overriding command " << subcmd << "!");
+	ChatCommand &cmd = add(subcmd, module);
+	cmd.setMain(action);
 }
 
-void ChatCommand::add(cstr_t &subcmd, ChatCommandAction action)
+ChatCommand &ChatCommand::add(cstr_t &subcmd, IModule *module)
 {
-	auto [it, is_new] = m_subs.insert({subcmd, ChatCommand(m_module)});
-	it->second.setMain(action);
+	ASSERT(module || m_module, "ChatCommand instance must be owned by a module");
 
-	if (!is_new)
+	auto [it, is_new] = m_subs.insert({subcmd, ChatCommand(module ? module : m_module)});
+
+	if (!is_new) {
 		WARN("Overriding command " << subcmd << "!");
+		m_subs.clear();
+	}
+
+	return it->second;
+}
+
+void ChatCommand::remove(IModule *module)
+{
+	// Remove all affected subcommands
+	for (auto it = m_subs.begin(); it != m_subs.end(); ) {
+		if (it->second.m_module == module)
+			m_subs.erase(it++);
+		else
+			++it;
+	}
+
+	if (m_module == module) {
+		m_module = nullptr;
+		m_action = nullptr;
+	}
 }
 
 bool ChatCommand::run(Channel *c, UserInstance *ui, std::string &msg)
 {
 	if (msg.empty() || m_subs.empty())
-		return m_action && (m_module->*m_action)(c, ui, msg);
+		return m_module && (m_module->*m_action)(c, ui, msg);
 
 	std::string cmd(get_next_part(msg));
 	auto it = m_subs.find(cmd);

@@ -145,7 +145,7 @@ bool ModuleMgr::reloadModule(std::string name, bool keep_data)
 
 		auto &users = net->getAllUsers();
 		for (auto ui : users)
-			ui->data->move(expired_ptr, mi->module);
+			ui->move(expired_ptr, mi->module);
 
 		for (Channel *c : net->getAllChannels())
 			c->getContainers()->move(expired_ptr, mi->module);
@@ -300,7 +300,7 @@ void ModuleInternal::unload(Network *net)
 
 		auto &users = net->getAllUsers();
 		for (auto ui : users)
-			ui->data->remove(module);
+			ui->remove(module);
 
 		for (Channel *c : net->getAllChannels())
 			c->getContainers()->remove(module);

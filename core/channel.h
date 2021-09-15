@@ -9,28 +9,17 @@
 
 class Client;
 class Channel;
+class IUserOwner;
 
 // This is network-wide
 
-class UserInstance {
+class UserInstance : public Containers {
 public:
 	UserInstance(cstr_t &name);
-	~UserInstance();
-	void grab()
-	{
-		m_references++;
-	}
-	void drop()
-	{
-		m_references--;
-		if (m_references <= 0)
-			delete this;
-	}
 	int getRefs() const { return m_references; }
 
 	std::string nickname;
 	std::string hostmask;
-	Containers *data;
 
 	// Valid for ACC and STATUS
 	enum UserAccStatus {
@@ -43,6 +32,20 @@ public:
 	UserAccStatus account = UAS_UNKNOWN;
 
 private:
+	friend class IUserOwner;
+	friend class Channel;
+
+	void grabRef()
+	{
+		m_references++;
+	}
+	void dropRef()
+	{
+		m_references--;
+		if (m_references <= 0)
+			delete this;
+	}
+
 	int m_references;
 };
 

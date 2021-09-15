@@ -24,9 +24,10 @@ public:
 
 	void initCommands(ChatCommand &cmd)
 	{
-		m_chatcommands = &cmd;
+		m_commands = &cmd;
 		cmd.add("$help",     (ChatCommandAction)&nbm_builtin::cmd_help,     this);
 		cmd.add("$remember", (ChatCommandAction)&nbm_builtin::cmd_remember, this);
+		cmd.add("$setting",  (ChatCommandAction)&nbm_builtin::cmd_setting, this);
 	}
 
 	void onClientReady()
@@ -44,7 +45,7 @@ public:
 			return;
 
 		for (UserInstance *ui : getNetwork()->getAllUsers()) {
-			BuiltinContainer *bc = (BuiltinContainer *)ui->data->get(this);
+			BuiltinContainer *bc = (BuiltinContainer *)ui->get(this);
 			if (bc)
 				m_settings->set(ui->nickname, bc->remember_text);
 		}
@@ -75,21 +76,7 @@ public:
 			std::string keep(get_next_part(msg));
 
 			getModuleMgr()->reloadModule(module, is_yes(keep));
-			c->say(ui->nickname + ": Enqueued!");
-			return true;
-		}
-		if (cmd == "$set") {
-			std::string key(get_next_part(msg));
-			m_settings->set(key, strtrim(msg));
-			return true;
-		}
-		if (cmd == "$get") {
-			std::string key(get_next_part(msg));
-			c->say(ui->nickname + ": " + m_settings->get(key));
-			return true;
-		}
-		if (cmd == "$save") {
-			onModuleUnload();
+			c->notice(ui, "Enqueued!");
 			return true;
 		}
 		if (cmd == "$quit") {
@@ -102,7 +89,11 @@ public:
 
 	CHATCMD_FUNC(cmd_help)
 	{
-		c->say("Available commands: " + m_chatcommands->getList());
+		//auto parent = m_commands->getParent((ChatCommandAction)&nbm_builtin::cmd_help);
+		// ^ for subcommand help
+
+		c->say("Available commands: " + m_commands->getList() +
+			"$reload <module> [<keep>], $quit");
 		return true;
 	}
 
@@ -110,11 +101,11 @@ public:
 	{
 		std::string what(strtrim(msg));
 
-		BuiltinContainer *bc = (BuiltinContainer *)ui->data->get(this);
+		BuiltinContainer *bc = (BuiltinContainer *)ui->get(this);
 		if (!bc) {
 			bc = new BuiltinContainer();
 			bc->remember_text = m_settings->get(ui->nickname);
-			ui->data->add(this, bc);
+			ui->add(this, bc);
 		}
 
 		if (what.empty()) {
@@ -129,9 +120,31 @@ public:
 		return true;
 	}
 
+	CHATCMD_FUNC(cmd_setting)
+	{
+		std::string cmd(get_next_part(msg));
+		if (cmd == "set") {
+			std::string key(get_next_part(msg));
+			m_settings->set(key, strtrim(msg));
+			return true;
+		}
+		if (cmd == "get") {
+			std::string key(get_next_part(msg));
+			c->say(ui->nickname + ": " + m_settings->get(key));
+			return true;
+		}
+		if (cmd == "save") {
+			onModuleUnload();
+			return true;
+		}
+
+		c->say("Available commands: set, get, save");
+		return true;
+	}
+
 private:
 	Settings *m_settings = nullptr;
-	ChatCommand *m_chatcommands = nullptr;
+	ChatCommand *m_commands = nullptr;
 };
 
 extern "C" {

@@ -81,10 +81,10 @@ static const struct {
 	const char *text;
 	const char *terminal_fmt;
 } s_format[LL_INVALID] = {
-	{ " verbose ", "\e[1;30m" },
-	{ "         ", "\e[0;36m" },
-	{ " WARNING ", "\e[1;33m" },
-	{ "  ERROR  ", "\e[0;31m" },
+	{ " verbose  ", "\e[1;30m" },
+	{ "          ", "\e[0;36m" },
+	{ " WARNING  ", "\e[1;33m" },
+	{ "  ERROR   ", "\e[0;31m" },
 };
 
 LoggerAssistant::LoggerAssistant(LogLevel level, const char *func)

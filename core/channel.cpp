@@ -8,14 +8,7 @@
 UserInstance::UserInstance(cstr_t &name)
 {
 	nickname = name;
-	data = new Containers();
 	m_references = 0;
-}
-
-UserInstance::~UserInstance()
-{
-	delete data;
-	data = nullptr;
 }
 
 
@@ -32,7 +25,7 @@ IUserOwner::IUserOwner(Client *cli)
 IUserOwner::~IUserOwner()
 {
 	for (UserInstance *ui : m_users)
-		ui->drop();
+		ui->dropRef();
 
 	m_users.clear();
 }
@@ -47,7 +40,7 @@ UserInstance *IUserOwner::addUser(cstr_t &name)
 			ui = new UserInstance(name);
 		else
 			ui = m_client->getNetwork()->addUser(name);
-		ui->grab();
+		ui->grabRef();
 	}
 
 	// std::set has unique keys
@@ -78,7 +71,7 @@ bool IUserOwner::removeUser(UserInstance *ui)
 			c->removeUser(ui);
 	}
 
-	ui->drop();
+	ui->dropRef();
 	m_users.erase(it);
 	return true;
 }
@@ -103,7 +96,7 @@ Channel::~Channel()
 	m_containers = nullptr;
 
 	for (UserInstance *ui : m_users)
-		ui->drop();
+		ui->dropRef();
 	m_users.clear();
 }
 

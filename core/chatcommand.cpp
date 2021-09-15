@@ -28,6 +28,20 @@ ChatCommand &ChatCommand::add(cstr_t &subcmd, IModule *module)
 	return it->second;
 }
 
+const ChatCommand *ChatCommand::getParent(ChatCommandAction action) const
+{
+	for (const auto &it : m_subs) {
+		if (it.second.m_action == action)
+			return this;
+
+		const ChatCommand *cmd = it.second.getParent(action);
+		if (cmd)
+			return cmd;
+	}
+
+	return nullptr;
+}
+
 void ChatCommand::remove(IModule *module)
 {
 	// Remove all affected subcommands
@@ -44,21 +58,26 @@ void ChatCommand::remove(IModule *module)
 	}
 }
 
-bool ChatCommand::run(Channel *c, UserInstance *ui, std::string &msg)
+bool ChatCommand::run(Channel *c, UserInstance *ui, std::string &msg) const
 {
-	if (msg.empty() || m_subs.empty())
-		return m_module && (m_module->*m_action)(c, ui, msg);
-
+	bool run = false;
 	std::string cmd(get_next_part(msg));
+
 	auto it = m_subs.find(cmd);
-	return (it != m_subs.end()) && it->second.run(c, ui, msg);
+	if (it != m_subs.end())
+		run = it->second.run(c, ui, msg);
+
+	// Show help function if available
+	if (!run)
+		run = m_module && (m_module->*m_action)(c, ui, msg);
+	return run;
 }
 
-std::string ChatCommand::getList()
+std::string ChatCommand::getList() const
 {
 	bool first = true;
 	std::ostringstream oss;
-	for (auto it : m_subs) {
+	for (const auto &it : m_subs) {
 		if (!first)
 			oss << ", ";
 

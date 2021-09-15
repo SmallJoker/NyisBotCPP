@@ -11,7 +11,7 @@ class UserInstance;
 #define CHATCMD_FUNC(name) \
 	bool (name)(Channel *c, UserInstance *ui, std::string msg)
 
-typedef bool (IModule::*ChatCommandAction)(Channel *c, UserInstance *ui, std::string msg);
+typedef CHATCMD_FUNC(IModule::*ChatCommandAction);
 
 class ChatCommand {
 public:
@@ -22,11 +22,12 @@ public:
 
 	void         add(cstr_t &subcmd, ChatCommandAction action, IModule *module = nullptr);
 	ChatCommand &add(cstr_t &subcmd, IModule *module = nullptr);
+	const ChatCommand *getParent(ChatCommandAction action) const;
 	void remove(IModule *module);
 
-	bool run(Channel *c, UserInstance *ui, std::string &msg);
+	bool run(Channel *c, UserInstance *ui, std::string &msg) const;
 
-	std::string getList();
+	std::string getList() const;
 
 private:
 	ChatCommandAction m_action = nullptr;

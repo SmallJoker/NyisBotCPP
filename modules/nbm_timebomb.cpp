@@ -2,7 +2,6 @@
 #include "../core/chatcommand.h"
 #include "../core/module.h"
 #include "../core/utils.h"
-#include "../core/logger.h"
 
 class MyTimebomb : public IContainer {
 public:
@@ -109,6 +108,7 @@ public:
 				which.append(", ");
 			which.append(tb->colors.back());
 		}
+		tb->good_wire = tb->colors[get_random() % tb->colors.size()];
 
 		tb->victim = victim;
 		c->say(victim->nickname + ": OUCH! Someone planted a bomb! "
@@ -133,8 +133,8 @@ public:
 		}
 
 		bool found = false;
-		for (const auto &c : tb->colors) {
-			if (c == selected) {
+		for (size_t i = 0; i < COLORS; ++i) {
+			if (s_colors[i] == selected) {
 				found = true;
 				break;
 			}

@@ -52,19 +52,6 @@ public:
 		m_settings->syncFileContents();
 	}
 
-	void onChannelJoin(Channel *c)
-	{
-		c->say("Hello world!");
-	}
-	void onUserJoin(Channel *c, UserInstance *ui)
-	{
-		c->say("Hello " + ui->nickname  + "!");
-	}
-
-	virtual void onUserLeave(Channel *c, UserInstance *ui) {}
-
-	virtual void onUserRename(UserInstance *ui, cstr_t &old_name) {}
-
 	bool onUserSay(Channel *c, UserInstance *ui, std::string &msg)
 	{
 		std::string cmd(get_next_part(msg));
@@ -102,7 +89,7 @@ public:
 		// ^ for subcommand help
 
 		c->say("Available commands: " + m_commands->getList() +
-			" $reload <module> [<keep>], $quit");
+			", $reload <module> [<keep>], $list, $quit");
 	}
 
 	CHATCMD_FUNC(cmd_remember)

@@ -4,6 +4,19 @@
 #include <fstream>
 
 
+bool SettingType::parseInt(cstr_t &str, int *v)
+{
+	int status = sscanf(str.c_str(), "%i", v);
+	return status == 1;
+}
+
+bool SettingType::parseFloat(cstr_t &str, float *v)
+{
+	int status = sscanf(str.c_str(), "%f", v);
+	return status == 1;
+}
+
+
 Settings::Settings(cstr_t &filename, Settings *parent, cstr_t &prefix)
 {
 	m_file = filename;

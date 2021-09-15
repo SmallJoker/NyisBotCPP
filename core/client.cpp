@@ -252,6 +252,8 @@ void Client::handleClientEvent(cstr_t &status, NetworkEvent *e)
 
 			if (strchr(m_user_modes, 'r'))
 				m_auth_status = AS_JOIN_CHANNELS;
+			if (m_auth_type == 0 && strchr(m_user_modes, 'i'))
+				m_auth_status = AS_JOIN_CHANNELS;
 		}
 		return;
 	}
@@ -314,13 +316,16 @@ void Client::handleClientEvent(cstr_t &status, NetworkEvent *e)
 
 void Client::handleChatMessage(cstr_t &status, NetworkEvent *e)
 {
-	// Log this line
-	write_timestamp(&std::cout);
-	std::cout << " ";
-	if (!e->nickname.empty() && e->nickname != m_nickname)
-		std::cout << e->nickname << " \t";
+	{
+		// Log this line
+		auto &os = g_logger->getStdout(LL_NORMAL);
+		write_timestamp(&os);
+		os << " ";
+		if (!e->nickname.empty() && e->nickname != m_nickname)
+			os << e->nickname << " \t";
 
-	std::cout << e->text << std::endl;
+		os << e->text << std::endl;
+	}
 
 	if (status == "PRIVMSG") {
 		// nick!host PRIVMSG where :text text
@@ -328,19 +333,27 @@ void Client::handleChatMessage(cstr_t &status, NetworkEvent *e)
 			// Retrieve pending user status requests
 
 			auto args = strsplit(e->text);
+			int status = -1;
+			std::string *nick = nullptr;
+
 			if (m_auth_type == 1) {
 				if (args[1] == "ACC") {
 					// For IRCd: solanum
-					int status = args[2][0] - '0';
-					cstr_t &nick = args[0];
+					status = args[2][0] - '0';
+					nick = &args[0];
 				}
 			} else if (m_auth_type == 2) {
 				if (args[0] == "STATUS") {
 					// For IRCd: plexus
-					int status = args[2][0] - '0';
-					cstr_t &nick = args[1];
+					status = args[2][0] - '0';
+					nick = &args[1];
 				}
 			}
+			if (!nick)
+				return;
+
+			UserInstance *ui = m_network->getUser(*nick);
+			ui->account = static_cast<UserInstance::UserAccStatus>(status);
 			return;
 		}
 
@@ -352,7 +365,7 @@ void Client::handleChatMessage(cstr_t &status, NetworkEvent *e)
 
 		Channel *c = m_network->getChannel(channel);
 		if (!c) {
-			ERROR("Channel " << channel << "does not exist");
+			ERROR("Got PRIVMSG before JOIN:  " << channel);
 			c = m_network->addChannel(channel);
 		}
 
@@ -378,8 +391,6 @@ void Client::handleAuthentication(cstr_t &status, NetworkEvent *e)
 		SettingTypeLong at; m_settings->get("client.authtype", &at);
 		if (at.value > 0)
 			m_auth_status = AS_AUTHENTICATE;
-		else
-			m_auth_status = AS_JOIN_CHANNELS;
 
 		m_network->addUser(m_nickname);
 		return;
@@ -393,13 +404,7 @@ void Client::handleAuthentication(cstr_t &status, NetworkEvent *e)
 
 void Client::handleServerMessage(cstr_t &status, NetworkEvent *e)
 {
-	VERBOSE("Server message: " << status);
-	e->dump();
-
-	int status_i = 0;
-	sscanf(status.c_str(), "%i", &status_i);
-
-	if (status_i == 353) {
+	if (status == "353") {
 		// User list
 		cstr_t &channel = e->args[4];
 		std::vector<std::string> users = strsplit(e->text);
@@ -443,6 +448,7 @@ const ClientActionEntry Client::s_actions[] = {
 	{ 1, "451", &Client::handleAuthentication }, // ERR_NOTREGISTERED
 // Server information and events
 	{ 0, "PING", &Client::handlePing },
+	{ 1, "250", &Client::handleChatMessage }, // User stats
 	{ 1, "251", &Client::handleChatMessage }, // RPL_LUSERCLIENT
 	{ 1, "253", &Client::handleChatMessage }, // RPL_LUSERUNKNOWN
 	{ 1, "255", &Client::handleChatMessage }, // RPL_LUSERME

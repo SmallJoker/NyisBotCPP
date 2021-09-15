@@ -17,6 +17,9 @@ public:
 	{
 		return "<invalid>";
 	}
+protected:
+	bool parseInt(cstr_t &str, int *v);
+	bool parseFloat(cstr_t &str, float *v);
 };
 
 

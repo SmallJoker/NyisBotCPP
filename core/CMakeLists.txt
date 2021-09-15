@@ -1,5 +1,6 @@
 
 set(CORE_FILES
+	${CMAKE_CURRENT_SOURCE_DIR}/args_parser.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/channel.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/client.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/connection.cpp

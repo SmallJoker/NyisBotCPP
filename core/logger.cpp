@@ -30,22 +30,33 @@ void write_datetime(std::ostream *os)
 	*os << std::put_time(tm, "%c");
 }
 
-Logger::Logger(const char *filename)
+Logger::Logger()
 {
-	std::ofstream *os = new std::ofstream(filename, std::ios::out | std::ios::trunc);
-	m_file = os;
 	m_sink = new std::ostringstream();
-
-	*os << "====> Logging started: ";
-	write_datetime(os);
-	*os << std::endl;
 }
 
 Logger::~Logger()
 {
-	m_file->flush();
-	delete m_file;
+	if (m_file) {
+		m_file->flush();
+		delete m_file;
+	}
 	delete m_sink;
+}
+
+void Logger::setupFile(const char *filename)
+{
+	if (m_file) {
+		m_file->flush();
+		delete m_file;
+	}
+	
+	std::ofstream *os = new std::ofstream(filename, std::ios::out | std::ios::trunc);
+	m_file = os;
+
+	*os << "====> Logging started: ";
+	write_datetime(os);
+	*os << std::endl;
 }
 
 std::ostream &Logger::getStdout(LogLevel level)
@@ -59,7 +70,7 @@ std::ostream &Logger::getStdout(LogLevel level)
 
 std::ostream &Logger::getFile(LogLevel level)
 {
-	if (level >= m_loglevel_file)
+	if (level >= m_loglevel_file && m_file)
 		return *m_file;
 
 	m_sink->clear();

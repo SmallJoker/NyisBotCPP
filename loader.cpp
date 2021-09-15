@@ -2,7 +2,7 @@
 #include <dlfcn.h>
 #include <iostream>
 
-int main()
+int main(int argc, char *argv[])
 {
 	/*
 		Load the entire bot which is a shared library
@@ -16,11 +16,11 @@ int main()
 		return 1;
 	}
 
-	using MainType = int(*)();
+	using MainType = int(*)(int c, char *v[]);
 	auto func = reinterpret_cast<MainType>(dlsym(handle, "main"));
 	if (!func) {
 		std::cerr << "Entry point not found" << std::endl;
 		return 1;
 	}
-	return func();
+	return func(argc, argv);
 }

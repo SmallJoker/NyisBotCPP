@@ -40,8 +40,10 @@ extern Logger *g_logger;
 
 class Logger {
 public:
-	Logger(const char *filename);
+	Logger();
 	~Logger();
+
+	void setupFile(const char *filename);
 
 	void setLogLevels(LogLevel ll_stdout, LogLevel ll_file)
 	{

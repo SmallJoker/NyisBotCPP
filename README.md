@@ -12,8 +12,17 @@ License: MIT
      * Settings file read/write API
      * Generic data container
      * cURL-based communication API
+     * Simple CLI argument parser
      * Utility functions
 
+## Setup
+
+1. Clone the repository
+2. Setup cmake: `cmake -S . -B build`
+3. Build: `cd build && make -j`
+4. Add config dir: `ln -s ../config .`
+5. Configure
+6. Run: `./loader`
 
 ## TODO
 

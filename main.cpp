@@ -1,3 +1,4 @@
+#include "core/args_parser.h"
 #include "core/logger.h"
 #include "core/client.h"
 #include "core/connection.h"
@@ -17,14 +18,27 @@ void exit_main()
 
 extern "C" {
 
-DLL_EXPORT int main()
+DLL_EXPORT int main(int argc, char *argv[])
 {
-	g_logger = new Logger("debug.txt");
+	g_logger = new Logger();
+
+	bool run_client = true;
+	bool run_unittest = false;
+	bool load_modules = true;
+	std::string logfile("debug.txt");
+
+	CLIArg("no-modules", &load_modules);
+	CLIArg("logfile", &logfile);
+	CLIArg("quicktest", &run_client);
+	CLIArg("unittest", &run_unittest);
+	CLIArg::parseArgs(argc, argv);
+
+	g_logger->setupFile(logfile.c_str());
 	g_logger->setLogLevels(LL_VERBOSE, LL_NORMAL);
 
 	LOG("Startup");
 
-	if (0) {
+	if (run_unittest) {
 		Unittest test;
 		if (!test.runTests())
 			exit(EXIT_FAILURE);
@@ -50,17 +64,20 @@ DLL_EXPORT int main()
 	atexit(exit_main);
 
 	s_cli = new Client(&settings_rw);
-	if (!s_cli->getModuleMgr()->loadModules())
-		exit(EXIT_FAILURE);
-#if 0
-	s_cli->initialize();
-	s_cli->sendRaw("PING server");
-
-	while (s_cli->run()) {
-		s_cli->processTodos();
-		SLEEP_MS(20);
+	if (load_modules) {
+		if (!s_cli->getModuleMgr()->loadModules())
+			exit(EXIT_FAILURE);
 	}
-#endif
+
+	if (run_client) {
+		s_cli->initialize();
+		s_cli->sendRaw("PING server");
+
+		while (s_cli->run()) {
+			s_cli->processTodos();
+			SLEEP_MS(20);
+		}
+	}
 	return 0;
 }
 

@@ -105,6 +105,12 @@ void Channel::say(cstr_t &text)
 	m_client->sendRaw("PRIVMSG " + m_name + " :" + text);
 }
 
+void Channel::reply(UserInstance *ui, cstr_t &text)
+{
+	// Helpful for new Client types
+	say(ui->nickname + ": " + text);
+}
+
 void Channel::notice(UserInstance *ui, cstr_t &text)
 {
 	// Some IRC clients show this text in a separate tab... :(

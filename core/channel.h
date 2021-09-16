@@ -86,6 +86,7 @@ public:
 	{ return m_containers; }
 
 	void say(cstr_t &text);
+	void reply(UserInstance *ui, cstr_t &text);
 	void notice(UserInstance *ui, cstr_t &text);
 	void leave();
 private:

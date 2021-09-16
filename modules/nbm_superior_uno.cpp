@@ -108,8 +108,9 @@ private:
 
 class UnoGame : public IContainer {
 public:
-	UnoGame(Channel *c, Settings *s) :
-		m_channel(c), m_settings(s) {}
+	UnoGame(uint8_t modes, Channel *c, Settings *s) :
+		m_channel(c), m_settings(s), m_modes(modes) {}
+
 	~UnoGame()
 	{
 		for (UserInstance *ui : m_players)

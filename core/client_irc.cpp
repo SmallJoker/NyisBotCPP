@@ -58,6 +58,7 @@ void ClientIRC::initialize()
 	SettingTypeLong port;     m_settings->get("client.port", &port);
 
 	m_con = new Connection(addr, port.value);
+	sendRaw("PING server");
 }
 
 void ClientIRC::processTodos()

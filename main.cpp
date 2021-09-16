@@ -25,6 +25,7 @@ DLL_EXPORT int main(int argc, char *argv[])
 	bool run_client = true;
 	bool run_unittest = false;
 	bool load_modules = true;
+	bool verbose = false;
 	std::string logfile("debug.txt");
 	std::string config_type("user");
 
@@ -33,10 +34,11 @@ DLL_EXPORT int main(int argc, char *argv[])
 	CLIArg("logfile",    &logfile);
 	CLIArg("quicktest",  &run_client);
 	CLIArg("unittest",   &run_unittest);
+	CLIArg("verbose",    &verbose);
 	CLIArg::parseArgs(argc, argv);
 
 	g_logger->setupFile(logfile.c_str());
-	g_logger->setLogLevels(LL_VERBOSE, LL_NORMAL);
+	g_logger->setLogLevels(verbose ? LL_VERBOSE : LL_NORMAL, LL_NORMAL);
 
 	LOG("Startup");
 
@@ -73,7 +75,6 @@ DLL_EXPORT int main(int argc, char *argv[])
 
 	if (run_client) {
 		s_cli->initialize();
-		s_cli->sendRaw("PING server");
 
 		while (s_cli->run()) {
 			s_cli->processTodos();

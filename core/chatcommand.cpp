@@ -61,7 +61,7 @@ void ChatCommand::remove(IModule *module)
 bool ChatCommand::run(Channel *c, UserInstance *ui, std::string &msg) const
 {
 	// Main command
-	if (m_module && (msg.empty() || m_subs.empty())) {
+	if (m_module && m_action && (msg.empty() || m_subs.empty())) {
 		(m_module->*m_action)(c, ui, msg);
 		return true;
 	}
@@ -75,7 +75,7 @@ bool ChatCommand::run(Channel *c, UserInstance *ui, std::string &msg) const
 	}
 
 	// Show help function if available
-	if (m_module) {
+	if (m_module && m_action) {
 		(m_module->*m_action)(c, ui, msg);
 		return true;
 	}

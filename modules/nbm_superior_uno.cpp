@@ -18,24 +18,34 @@ struct Card {
 	static std::string format(const std::vector<Card> &cards)
 	{
 		std::ostringstream ss;
-		ss << "\x0F\x02"; // Normal text + Bold start
+		ss << "\x0F"; // Normal text + Bold start
 		for (const Card &c : cards)
-			ss << colorize_string("[" + std::string(c.face) + "] ", c.color);
+			ss << colorize_string("\x02[" + std::string(c.face) + "] ", c.color);
 
 		ss << "\x0F "; // Normal text
 		return ss.str();
 	}
 
+	static size_t findType(cstr_t &type)
+	{
+		size_t i;
+		for (i = 0; i < FACES_MAX; ++i) {
+			if (type == FACES[i])
+				break;
+		}
+		return i;
+	}
+
 	IRC_Color color = IC_BLACK;
 	const char *face = nullptr;
 
-	static const size_t TYPES_MAX = 15;
-	static const char *TYPES[];
+	static const size_t FACES_MAX = 15;
+	static const char *FACES[];
 	static const size_t COLORS_MAX = 5;
 	static const IRC_Color COLORS[];  // IRC colors
 };
 
-const char *Card::TYPES[Card::TYPES_MAX] = {
+const char *Card::FACES[Card::FACES_MAX] = {
 	"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "D2", "R", "S", "W", "WD4"
 };
 
@@ -43,6 +53,8 @@ const IRC_Color Card::COLORS[Card::COLORS_MAX] = { IC_BLACK, IC_RED, IC_GREEN, I
 
 class UnoPlayer : public IContainer, public SettingType {
 public:
+	std::string dump() const { return "UnoPlayer"; }
+
 	// For settings
 	bool deSerialize(cstr_t &str)
 	{
@@ -69,7 +81,7 @@ public:
 
 		while (count > 0) {
 			IRC_Color  color = Card::COLORS[get_random() % Card::COLORS_MAX];
-			const char *face = Card::TYPES[get_random() % Card::TYPES_MAX];
+			const char *face = Card::FACES[get_random() % Card::FACES_MAX];
 
 			if (strchr(face, 'W')) {
 				color = IC_BLACK; // must be black
@@ -85,10 +97,11 @@ public:
 				.color = color,
 				.face = face
 			});
+			count--;
 		}
 
 		cards.insert(cards.end(), drawn.begin(), drawn.end());
-		sortCards();
+		std::sort(cards.begin(), cards.end());
 		return drawn;
 	}
 
@@ -123,7 +136,7 @@ public:
 
 			p->m_elo += (int)delta;
 			p->m_streak = 0;
-			if (players.size() == 2) {
+			if (players.size() == MIN_PLAYERS) {
 				// Only for last man standing
 				p->m_losses++;
 			}
@@ -135,12 +148,8 @@ public:
 		return "stub";
 	}
 
-	void sortCards()
-	{
-		std::sort(cards.begin(), cards.end());
-	}
-
 	std::vector<Card> cards;
+	static const size_t MIN_PLAYERS = true ? 2 : 1; // Debug mode
 private:
 	static const int GAIN_FACTOR = 30;
 	long m_wins = 0,
@@ -152,9 +161,12 @@ private:
 
 class UnoGame : public IContainer {
 public:
+	std::string dump() const { return "UnoGame"; }
+
 	UnoGame(Channel *c, Settings *s) :
 		m_channel(c), m_settings(s)
 	{
+		// 0x87
 		modes = UM_RANKED | UM_UPGRADE | UM_STACK_WD4 | UM_STACK_D2;
 	}
 
@@ -203,9 +215,17 @@ public:
 			current = nullptr;
 			return;
 		}
+
 		auto it = m_players.find(current);
-		if (++it == m_players.end())
-			it = m_players.begin();
+		if (dir_forwards) {
+			if (++it == m_players.end())
+				it = m_players.begin();
+		} else {
+			if (it == m_players.begin()) {
+				it = m_players.end();
+				it--;
+			}
+		}
 		current = *it;
 	}
 
@@ -218,6 +238,7 @@ public:
 			return false;
 
 		ui->set(this, new UnoPlayer());
+		m_players.insert(ui);
 		return true;
 	}
 
@@ -265,12 +286,16 @@ public:
 
 	bool start()
 	{
-		if (m_players.size() < 2)
+		if (m_players.size() < UnoPlayer::MIN_PLAYERS || has_started)
 			return false;
 
+		for (UserInstance *ui : m_players)
+			getPlayer(ui)->drawCards(11, 2);
+	
 		has_started = true;
 		m_initial_player_count = m_players.size();
 		current = *m_players.begin();
+		top_card = getPlayer(current)->cards[0];
 		return true;
 	}
 
@@ -278,6 +303,7 @@ public:
 	UserInstance *current = nullptr;
 	Card top_card;
 	int draw_count = 0;
+	bool dir_forwards = true;
 	uint8_t modes;
 
 private:
@@ -300,10 +326,14 @@ public:
 	void initCommands(ChatCommand &cmd)
 	{
 		ChatCommand &uno = cmd.add("$uno", this);
+		uno.setMain((ChatCommandAction)&nbm_superior_uno::cmd_help);
 		uno.add("join",  (ChatCommandAction)&nbm_superior_uno::cmd_join);
 		uno.add("leave", (ChatCommandAction)&nbm_superior_uno::cmd_leave);
+		uno.add("deal",  (ChatCommandAction)&nbm_superior_uno::cmd_deal);
+		uno.add("top",   (ChatCommandAction)&nbm_superior_uno::cmd_top);
 		uno.add("p",     (ChatCommandAction)&nbm_superior_uno::cmd_play);
 		uno.add("d",     (ChatCommandAction)&nbm_superior_uno::cmd_draw);
+		m_commands = &uno;
 	}
 
 	void onClientReady()
@@ -327,11 +357,15 @@ public:
 			g->removePlayer(ui);
 
 			if (processGameUpdate(c)) {
-				c->say("[UNO] " + ui->nickname + " left this game.");
 				if (old_current != g->current)
 					tellGameStatus(c);
 			}
 		}
+	}
+
+	void onChannelLeave(Channel *c)
+	{
+		delete getGame(c);
 	}
 
 	// Returns whether the game is still active
@@ -340,7 +374,7 @@ public:
 		UnoGame *g = getGame(c);
 		if (!g)
 			return false;
-		if (g->getPlayerCount() > 1)
+		if (g->getPlayerCount() >= UnoPlayer::MIN_PLAYERS)
 			return true;
 		if (g->has_started)
 			c->say("[UNO] Game ended");
@@ -373,6 +407,11 @@ public:
 		c->notice(to_user, "Your cards: " + Card::format(g->getPlayer(to_user)->cards));
 	}
 
+	CHATCMD_FUNC(cmd_help)
+	{
+		c->say("Available subcommands: " + m_commands->getList());
+	}
+
 	CHATCMD_FUNC(cmd_join)
 	{
 		UnoGame *g = getGame(c);
@@ -402,7 +441,7 @@ public:
 		if (g->checkMode(UnoGame::UM_RANKED) &&
 				ui->account != UserInstance::UAS_LOGGED_IN) {
 			c->notice(ui, "You must be logged in to play ranked UNO");
-			g->removePlayer(ui);
+			onUserLeave(c, ui);
 			return;
 		}
 
@@ -419,24 +458,185 @@ public:
 		UnoGame *g = getGame(c);
 		UnoPlayer *p = g ? g->getPlayer(ui) : nullptr;
 		if (!g || !p) {
-			c->notice(ui, "You are not part of an UNO game.");
+			c->notice(ui, "There is nothing to leave...");
 			return;
 		}
 		onUserLeave(c, ui);
 	}
 
+	CHATCMD_FUNC(cmd_deal)
+	{
+		UnoGame *g = getGame(c);
+		UnoPlayer *p = g ? g->getPlayer(ui) : nullptr;
+		if (!p || g->has_started) {
+			c->notice(ui, "There is no game to start.");
+			return;
+		}
+		if (!g->start()) {
+			c->say("Game start failed. Either there are < 2 players, "
+				"or the game is already ongoing.");
+			return;
+		}
+		tellGameStatus(c);
+	}
+
+	CHATCMD_FUNC(cmd_top)
+	{
+		UnoGame *g = getGame(c);
+		UnoPlayer *p = g ? g->getPlayer(ui) : nullptr;
+		if (!p || !g->has_started) {
+			c->notice(ui, "You are not part of an ongoing game.");
+			return;
+		}
+		tellGameStatus(c, ui);
+	}
+
 	CHATCMD_FUNC(cmd_play)
 	{
-		
+		UnoGame *g = getGame(c);
+		UnoPlayer *p = g ? g->getPlayer(ui) : nullptr;
+		if (!p || !g->has_started) {
+			c->notice(ui, "huh?? You don't have any cards.");
+			return;
+		}
+		if (g->checkMode(UnoGame::UM_LIGRETTO))
+			g->current = ui;
+
+		if (g->current != ui) {
+			c->notice(ui, "It is not your turn (current: " + g->current->nickname + ").");
+			return;
+		}
+		std::string color_s(get_next_part(msg));
+		IRC_Color color_e = IC_BLACK;
+		std::string face_s(get_next_part(msg));
+
+		if (color_s.size() >= 2) {
+			// Example: $uno p rd2
+			face_s = color_s.substr(1);
+			color_s = color_s.substr(0, 1);
+		}
+
+		for (char &c : face_s)
+			c = toupper(c);
+
+		// Convert text colors to IRC Colors
+		switch (toupper(color_s[0])) {
+			case 'R': color_e = IC_RED;    break;
+			case 'G': color_e = IC_GREEN;  break;
+			case 'B': color_e = IC_BLUE;   break;
+			case 'Y': color_e = IC_YELLOW; break;
+		}
+		bool change_face = face_s.find('W') != std::string::npos;
+		size_t face_index = Card::findType(face_s);
+
+		if (color_e == IC_BLACK || face_index == Card::FACES_MAX) {
+			c->notice(ui, "Invalid input. Syntax: $uno p <color> <face>, $p <color><face>.");
+			return;
+		}
+
+		// Check whether color of face matches
+		if (color_e != g->top_card.color && face_s != g->top_card.face
+				&& !change_face) {
+
+			c->notice(ui, "This card cannot be played. Please check color and face.");
+			return;
+		}
+
+		auto it = std::find_if(p->cards.begin(), p->cards.end(), [=] (auto &a) {
+			return a.face == face_s && (change_face || a.color == color_e);
+		});
+
+		if (it == p->cards.end()) {
+			c->notice(ui, "You don't have this card.");
+			return;
+		}
+
+		if (g->draw_count > 0) {
+			bool ok = false;
+			if (face_s == "D2" &&
+					face_s == g->top_card.face && // No downgrade
+					g->checkMode(UnoGame::UM_STACK_D2))
+				ok = true;
+			else if (face_s == "WD4" &&
+					face_s == g->top_card.face &&
+					g->checkMode(UnoGame::UM_STACK_WD4))
+				ok = true;
+			else if (face_s == "WD4" &&
+					strcmp(g->top_card.face, "D2") == 0 &&
+					g->checkMode(UnoGame::UM_UPGRADE))
+				ok = true;
+
+			if (!ok) {
+				c->notice(ui, "You cannot play this card due to the top card.");
+				return;
+			}
+		}
+
+		// All OK. Put the card on top
+		g->top_card = Card {
+			.color = color_e,
+			.face = Card::FACES[face_index]
+		};
+		p->cards.erase(it);
+
+		bool pending_autodraw = false;
+
+		if (face_s == "D2") {
+			g->draw_count += 2;
+			pending_autodraw = !g->checkMode(UnoGame::UM_STACK_D2);
+		} else if (face_s == "WD4") {
+			g->draw_count += 4;
+			pending_autodraw = !g->checkMode(UnoGame::UM_STACK_WD4);
+		} else if (face_s == "R") {
+			if (g->getPlayerCount() > 2)
+				g->dir_forwards ^= true; // Toggle
+			else
+				g->turnNext(); // Acts as Skip for 2 players
+		} else if (face_s == "S") {
+			g->turnNext();
+		}
+
+		g->turnNext();
+
+		// Player won, except when it's again their turn (last card = skip)
+		if (p->cards.empty() && g->current != ui)
+			g->removePlayer(ui);
+
+		if (!processGameUpdate(c))
+			return; // Game ended
+
+		if (pending_autodraw)
+			cmd_draw(c, ui, "");
+		else
+			tellGameStatus(c);
 	}
 
 	CHATCMD_FUNC(cmd_draw)
 	{
-		
+		UnoGame *g = getGame(c);
+		UnoPlayer *p = g ? g->getPlayer(ui) : nullptr;
+		if (!p || !g->has_started) {
+			c->notice(ui, "You are not part of an ongoing game.");
+			return;
+		}
+		if (g->checkMode(UnoGame::UM_LIGRETTO))
+			g->current = ui;
+
+		if (g->current != ui) {
+			c->notice(ui, "It is not your turn (current: " + g->current->nickname + ").");
+			return;
+		}
+		auto drawn = p->drawCards(std::max(1, g->draw_count));
+		g->draw_count = 0;
+		c->notice(ui, "You drew the following cards: " + Card::format(drawn));
+
+		g->turnNext();
+		tellGameStatus(c);
 	}
 
 private:
 	Settings *m_settings = nullptr;
+	ChatCommand *m_commands = nullptr;
 };
 
 

@@ -12,11 +12,14 @@ Containers::~Containers()
 void Containers::set(const void *owner, IContainer *data)
 {
 	IContainer *existing = get(owner);
-	if (existing != data) {
-		WARN("Overwriting existing container data!");
+	if (existing && existing != data) {
+		WARN("Overwriting existing container data! "
+			<< "old=" << existing->dump()
+			<< ", new=" << data->dump());
 		delete existing;
 	}
 
+	VERBOSE(data->dump());
 	m_data.insert({owner, data});
 }
 

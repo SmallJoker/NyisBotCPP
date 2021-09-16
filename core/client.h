@@ -27,7 +27,7 @@ public:
 	{ return m_network; }
 
 	void addTodo(ClientTodo && ct);
-	virtual void processTodos() {};
+	virtual void processTodos() {}
 
 	virtual void sendRaw(cstr_t &text) {} // TODO: remove this
 

@@ -13,20 +13,22 @@ bool SettingType::parseLong(const char **pos, long *v, int base)
 {
 	char *endp = nullptr;
 	long val = strtol(*pos, &endp, base);
+	bool read = endp && endp != *pos;
 	*pos = endp;
-	if (endp)
+	if (read)
 		*v = val;
-	return endp != nullptr;
+	return read;
 }
 
 bool SettingType::parseFloat(const char **pos, float *v)
 {
 	char *endp = nullptr;
-	long val = strtof(*pos, &endp);
+	float val = strtof(*pos, &endp);
+	bool read = endp && endp != *pos;
 	*pos = endp;
-	if (endp)
+	if (read)
 		*v = val;
-	return endp != nullptr;
+	return read;
 }
 
 Settings::Settings(cstr_t &filename, Settings *parent, cstr_t &prefix)

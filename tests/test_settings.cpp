@@ -144,8 +144,25 @@ void test_Settings_write()
 	std::remove(filename.c_str());
 }
 
+void test_SettingType_util()
+{
+	std::string text("2903 C0FFEE 1.55E1 ");
+	const char *pos = text.c_str();
+	long longval;
+	float floatval;
+
+	TEST_CHECK(SettingType::parseLong(&pos, &longval) == true);
+	TEST_CHECK(longval == 2903);
+	TEST_CHECK(SettingType::parseLong(&pos, &longval, 16) == true);
+	TEST_CHECK(longval == 0xC0FFEE);
+	TEST_CHECK(SettingType::parseFloat(&pos, &floatval) == true);
+	TEST_CHECK(std::abs(floatval - 1.55E1f) < 0.001f);
+	TEST_CHECK(SettingType::parseLong(&pos, &longval) == false);
+}
+
 void test_Settings(Unittest *ut)
 {
 	TEST_REGISTER(test_Settings_read)
 	TEST_REGISTER(test_Settings_write)
+	TEST_REGISTER(test_SettingType_util)
 }

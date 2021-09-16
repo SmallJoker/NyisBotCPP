@@ -119,8 +119,10 @@ bool ModuleMgr::reloadModule(std::string name, bool keep_data)
 		break;
 	}
 
-	if (!mi)
+	if (!mi) {
+		WARN("No such module: " << name);
 		return false;
+	}
 
 	Network *net = m_client ? m_client->getNetwork() : nullptr;
 	IModule *expired_ptr = mi->module;
@@ -311,17 +313,16 @@ bool ModuleInternal::load(IClient *cli)
 
 void ModuleInternal::unload(Network *net)
 {
-	module->onModuleUnload();
-
 	if (net) {
 		// Remove this module data from all locations before the destructor turns invalid
+		for (Channel *c : net->getAllChannels()) {
+			module->onChannelLeave(c);
+			c->getContainers()->remove(module);
+		}
 
 		auto &users = net->getAllUsers();
 		for (auto ui : users)
 			ui->remove(module);
-
-		for (Channel *c : net->getAllChannels())
-			c->getContainers()->remove(module);
 	}
 
 	delete module;

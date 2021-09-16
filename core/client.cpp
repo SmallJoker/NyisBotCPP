@@ -1,6 +1,7 @@
 #include "client.h"
 #include "channel.h"
 #include "module.h"
+#include "settings.h"
 
 IClient::IClient(Settings *settings)
 {
@@ -12,6 +13,8 @@ IClient::IClient(Settings *settings)
 
 IClient::~IClient()
 {
+	m_settings->syncFileContents();
+
 	delete m_module_mgr;
 	m_module_mgr = nullptr;
 

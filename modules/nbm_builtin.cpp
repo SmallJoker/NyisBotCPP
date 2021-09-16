@@ -17,8 +17,8 @@ public:
 	~nbm_builtin()
 	{
 		LOG("Unload");
-		if (m_settings)
-			m_settings->syncFileContents();
+
+		saveSettings();
 		delete m_settings;
 	}
 
@@ -36,19 +36,6 @@ public:
 			return;
 
 		m_settings = getModuleMgr()->getSettings(this);
-		m_settings->syncFileContents();
-	}
-
-	void onModuleUnload()
-	{
-		if (!m_settings)
-			return;
-
-		for (UserInstance *ui : getNetwork()->getAllUsers()) {
-			BuiltinContainer *bc = (BuiltinContainer *)ui->get(this);
-			if (bc)
-				m_settings->set(ui->nickname, bc->remember_text);
-		}
 		m_settings->syncFileContents();
 	}
 
@@ -81,6 +68,20 @@ public:
 		}
 
 		return false;
+	}
+
+	void saveSettings()
+	{
+		if (!m_settings)
+			return;
+
+		for (UserInstance *ui : getNetwork()->getAllUsers()) {
+			BuiltinContainer *bc = (BuiltinContainer *)ui->get(this);
+			if (bc)
+				m_settings->set(ui->nickname, bc->remember_text);
+		}
+
+		m_settings->syncFileContents();
 	}
 
 	CHATCMD_FUNC(cmd_help)
@@ -127,7 +128,7 @@ public:
 			return;
 		}
 		if (cmd == "save") {
-			onModuleUnload();
+			saveSettings();
 			return;
 		}
 

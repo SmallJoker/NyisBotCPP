@@ -27,17 +27,21 @@ void test_Utils_strops()
 	TEST_CHECK(leftover == "");
 }
 
-void test_Utils_modes()
+void test_Utils_irc_stuff()
 {
 	std::string buf("    ");
 	apply_user_modes(&buf[0], "+abcd");
 	TEST_CHECK(buf == "abcd");
 	apply_user_modes(&buf[0], "-bd");
 	TEST_CHECK(buf == "a c ");
+
+	buf = " colorize me ";
+	std::string normal("\x03");
+	TEST_CHECK(colorize_string(buf, IC_LIGHT_GREEN) == normal + "09 colorize me \x0F");
 }
 
 void test_Utils(Unittest *ut)
 {
 	TEST_REGISTER(test_Utils_strops)
-	TEST_REGISTER(test_Utils_modes)
+	TEST_REGISTER(test_Utils_irc_stuff)
 }

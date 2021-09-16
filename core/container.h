@@ -11,7 +11,6 @@ class ICallbackHandler {
 public:
 	virtual ~ICallbackHandler() {}
 
-	virtual void onModuleUnload() {}
 	virtual void onStep(float time) {}
 	virtual void onChannelJoin(Channel *c) {}
 	virtual void onChannelLeave(Channel *c) {}

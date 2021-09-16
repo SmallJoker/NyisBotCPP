@@ -3,19 +3,31 @@
 #include <sstream>
 #include <fstream>
 
-
-bool SettingType::parseInt(cstr_t &str, int *v)
+bool SettingType::parseLong(cstr_t &str, long *v, int base)
 {
-	int status = sscanf(str.c_str(), "%i", v);
-	return status == 1;
+	const char *start = str.c_str();
+	return parseLong(&start, v, base);
 }
 
-bool SettingType::parseFloat(cstr_t &str, float *v)
+bool SettingType::parseLong(const char **pos, long *v, int base)
 {
-	int status = sscanf(str.c_str(), "%f", v);
-	return status == 1;
+	char *endp = nullptr;
+	long val = strtol(*pos, &endp, base);
+	*pos = endp;
+	if (endp)
+		*v = val;
+	return endp != nullptr;
 }
 
+bool SettingType::parseFloat(const char **pos, float *v)
+{
+	char *endp = nullptr;
+	long val = strtof(*pos, &endp);
+	*pos = endp;
+	if (endp)
+		*v = val;
+	return endp != nullptr;
+}
 
 Settings::Settings(cstr_t &filename, Settings *parent, cstr_t &prefix)
 {

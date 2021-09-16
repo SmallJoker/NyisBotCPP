@@ -26,11 +26,13 @@ DLL_EXPORT int main(int argc, char *argv[])
 	bool run_unittest = false;
 	bool load_modules = true;
 	std::string logfile("debug.txt");
+	std::string config_type("user");
 
+	CLIArg("config",     &config_type);
 	CLIArg("no-modules", &load_modules);
-	CLIArg("logfile", &logfile);
-	CLIArg("quicktest", &run_client);
-	CLIArg("unittest", &run_unittest);
+	CLIArg("logfile",    &logfile);
+	CLIArg("quicktest",  &run_client);
+	CLIArg("unittest",   &run_unittest);
 	CLIArg::parseArgs(argc, argv);
 
 	g_logger->setupFile(logfile.c_str());
@@ -57,7 +59,7 @@ DLL_EXPORT int main(int argc, char *argv[])
 	}
 
 	Settings settings_ro("config/main.defaults.conf", nullptr);
-	Settings settings_rw("config/main.user.conf", &settings_ro);
+	Settings settings_rw("config/main." + config_type + ".conf", &settings_ro);
 	settings_ro.syncFileContents();
 	settings_rw.syncFileContents();
 

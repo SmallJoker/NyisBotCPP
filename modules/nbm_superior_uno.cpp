@@ -3,10 +3,17 @@
 #include "../core/module.h"
 #include "../core/settings.h"
 #include "../core/utils.h"
+#include <algorithm> // std::sort
 #include <cstring>
-#include <parallel/sort.h>
 
 struct Card {
+	bool operator<(const Card &b)
+	{
+		if (color == b.color)
+			return strcmp(face, b.face) > 0;
+		return color > b.color;
+	}
+
 	enum CardColor {
 		CC_NONE,
 		CC_RED,
@@ -30,6 +37,7 @@ const int Card::COLORS[Card::CC_COLORS_MAX] = { 1, 4, 3, 2, 8 };
 
 class UnoPlayer : public IContainer, public SettingType {
 public:
+	// For settings
 	bool deSerialize(cstr_t &str)
 	{
 		auto parts = strsplit(str);
@@ -42,6 +50,7 @@ public:
 			&& parseInt(parts[3], &m_streak);
 	}
 
+	// For settings
 	std::string serialize() const
 	{
 		return std::to_string(m_wins)
@@ -79,9 +88,42 @@ public:
 		return drawn;
 	}
 
-	void win(std::set<UserInstance *> &players, int initial_player_count)
+	void win(std::set<UnoPlayer *> &players, int initial_player_count)
 	{
-		// stub
+		int elo_losers = 0;
+		for (UnoPlayer *p : players) {
+			if (p != this)
+				elo_losers += p->m_elo;
+		}
+		int elo_all = elo_losers + m_elo;
+
+		// Handle winner
+		{
+			double delta = (double)elo_losers / elo_all * GAIN_FACTOR + 0.5;
+			m_delta += (int)delta;
+
+			m_elo += (int)delta;
+			if (initial_player_count == players.size()) {
+				m_streak++;
+				m_wins++;
+			}
+		}
+
+		// Handle losers
+		for (UnoPlayer *p : players) {
+			if (p == this)
+				continue;
+
+			double delta = (double)p->m_elo / elo_all * -GAIN_FACTOR + 0.5;
+			p->m_delta += (int)delta;
+
+			p->m_elo += (int)delta;
+			p->m_streak = 0;
+			if (players.size() == 2) {
+				// Only for last man standing
+				p.m_losses++;
+			}
+		}
 	}
 
 	std::string formatElo(bool details)
@@ -91,19 +133,17 @@ public:
 
 	void sortCards()
 	{
-		std::sort(cards.begin(), cards.end(), [&] (const Card &a, const Card &b) -> int {
-			if (a.color == b.color)
-				return strcmp(a.face, b.face);
-			return (a.color > b.color) - (a.color < b.color);
-		});
+		std::sort(cards.begin(), cards.end());
 	}
 
 	std::vector<Card> cards;
 private:
+	static const int GAIN_FACTOR = 30;
 	int m_wins = 0,
 		m_losses = 0,
 		m_streak = 0,
-		m_elo = 1000;
+		m_elo = 1000,
+		m_delta = 0;
 };
 
 class UnoGame : public IContainer {
@@ -142,9 +182,16 @@ public:
 		current = *it;
 	}
 
-	void addPlayer(UserInstance *ui)
+	bool addPlayer(UserInstance *ui)
 	{
+		if (has_started)
+			return false;
+
+		if (getPlayer(ui))
+			return false;
+
 		ui->set(this, new UnoPlayer());
+		return true;
 	}
 
 	inline UnoPlayer *getPlayer(UserInstance *ui)
@@ -165,7 +212,11 @@ public:
 			std::string msg;
 			msg.append(ui->nickname).append(" finished the game. gg!");
 			if (checkMode(UM_RANKED)) {
-				player->win(m_players, m_initial_player_count);
+				std::set<UnoPlayer *> players;
+				for (UserInstance *ui : m_players)
+					players.insert(getPlayer(ui));
+
+				player->win(players, m_initial_player_count);
 
 				for (UserInstance *up : m_players)
 					m_settings->set(up->nickname, getPlayer(up));

@@ -15,7 +15,7 @@ static std::string NAME_PREFIX("libnbm_");
 
 
 struct ModuleInternal {
-	bool load(Client *cli);
+	bool load(IClient *cli);
 	void unload(Network *net);
 
 	void *dll_handle;
@@ -45,7 +45,7 @@ void IModule::sendRaw(cstr_t &what) const
 
 // ================= ModuleMgr =================
 
-ModuleMgr::ModuleMgr(Client *cli)
+ModuleMgr::ModuleMgr(IClient *cli)
 {
 	m_client = cli;
 	m_commands = new ChatCommand(nullptr);
@@ -280,7 +280,7 @@ bool ModuleMgr::onUserSay(Channel *c, UserInstance *ui, std::string &msg)
 
 // ================= ModuleInternal =================
 
-bool ModuleInternal::load(Client *cli)
+bool ModuleInternal::load(IClient *cli)
 {
 	LOG("Loading module " << path);
 	void *handle = dlopen(path.c_str(), RTLD_NOW);

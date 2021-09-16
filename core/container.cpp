@@ -1,4 +1,5 @@
 #include "container.h"
+#include "logger.h"
 
 Containers::~Containers()
 {
@@ -11,8 +12,10 @@ Containers::~Containers()
 void Containers::set(const void *owner, IContainer *data)
 {
 	IContainer *existing = get(owner);
-	if (existing != data)
+	if (existing != data) {
+		WARN("Overwriting existing container data!");
 		delete existing;
+	}
 
 	m_data.insert({owner, data});
 }

@@ -6,11 +6,11 @@
 #include "../core/settings.h"
 #include "../core/utils.h"
 
-static Client *client = nullptr;
+static IClient *client = nullptr;
 
 void test_Client_setup()
 {
-	client = new Client(nullptr);
+	client = new IClient(nullptr);
 }
 
 void test_Client_cleanup()

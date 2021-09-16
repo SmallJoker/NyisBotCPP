@@ -1,6 +1,6 @@
 // Class for the protocol implementation
 
-#include "client.h"
+#include "client_irc.h"
 #include "connection.h"
 #include "channel.h"
 #include "logger.h"
@@ -13,7 +13,7 @@
 struct ClientActionEntry {
 	int offset;
 	const char *status;
-	void (Client::*handler)(cstr_t &status, NetworkEvent *e);
+	void (ClientIRC::*handler)(cstr_t &status, NetworkEvent *e);
 };
 
 struct NetworkEvent {
@@ -32,32 +32,23 @@ struct NetworkEvent {
 	}
 };
 
-Client::Client(Settings *settings)
+ClientIRC::ClientIRC(Settings *settings) :
+	IClient(settings)
 {
-	m_settings = settings;
-
-	m_network = new Network(this);
-	m_module_mgr = new ModuleMgr(this);
 }
 
-Client::~Client()
+ClientIRC::~ClientIRC()
 {
 	if (m_con && m_auth_status != AS_SEND_NICK) {
 		sendRaw("QUIT :Goodbye");
 		SLEEP_MS(100);
 	}
 
-	delete m_module_mgr;
-	m_module_mgr = nullptr;
-
-	delete m_network;
-	m_network = nullptr;
-
 	delete m_con;
 	m_con = nullptr;
 }
 
-void Client::initialize()
+void ClientIRC::initialize()
 {
 	m_nickname = m_settings->get("client.nickname");
 	SettingTypeLong at; m_settings->get("client.authtype", &at);
@@ -69,14 +60,7 @@ void Client::initialize()
 	m_con = new Connection(addr, port.value);
 }
 
-void Client::addTodo(ClientTodo && ct)
-{
-	m_todo_lock.lock();
-	m_todo.push(std::move(ct));
-	m_todo_lock.unlock();
-}
-
-void Client::processTodos()
+void ClientIRC::processTodos()
 {
 	if (m_todo.empty())
 		return;
@@ -102,12 +86,38 @@ void Client::processTodos()
 	}
 }
 
-void Client::sendRaw(cstr_t &text)
+void ClientIRC::sendRaw(cstr_t &text)
 {
 	m_con->send(text + '\n');
 }
 
-bool Client::run()
+void ClientIRC::actionSay(Channel *c, cstr_t &text)
+{
+	sendRaw("PRIVMSG " + c->getName() + " :" + text);
+}
+
+void ClientIRC::actionReply(Channel *c, UserInstance *ui, cstr_t &text)
+{
+	actionSay(c, ui->nickname + ": " + text);
+}
+
+void ClientIRC::actionNotice(Channel *c, UserInstance *ui, cstr_t &text)
+{
+	// Some IRC clients show this text in a separate tab... :(
+	sendRaw("NOTICE " + ui->nickname + " :" + text);
+}
+
+void ClientIRC::actionJoin(cstr_t &channel)
+{
+	sendRaw("JOIN " + channel);
+}
+
+void ClientIRC::actionLeave(Channel *c)
+{
+	sendRaw("PART " + c->getName());
+}
+
+bool ClientIRC::run()
 {
 	if (!m_con) {
 		ERROR("Connection died");
@@ -193,19 +203,19 @@ bool Client::run()
 	return true;
 }
 
-void Client::handleUnknown(cstr_t &msg)
+void ClientIRC::handleUnknown(cstr_t &msg)
 {
 	VERBOSE("Unknown: " << msg);
 }
 
-void Client::handleError(cstr_t &status, NetworkEvent *e)
+void ClientIRC::handleError(cstr_t &status, NetworkEvent *e)
 {
 	ERROR(e->text);
 	delete m_con;
 	m_con = nullptr;
 }
 
-void Client::handleClientEvent(cstr_t &status, NetworkEvent *e)
+void ClientIRC::handleClientEvent(cstr_t &status, NetworkEvent *e)
 {
 	VERBOSE("Client event: " << status);
 	e->dump();
@@ -314,7 +324,7 @@ void Client::handleClientEvent(cstr_t &status, NetworkEvent *e)
 	}
 }
 
-void Client::handleChatMessage(cstr_t &status, NetworkEvent *e)
+void ClientIRC::handleChatMessage(cstr_t &status, NetworkEvent *e)
 {
 	{
 		// Log this line
@@ -374,13 +384,13 @@ void Client::handleChatMessage(cstr_t &status, NetworkEvent *e)
 	}
 }
 
-void Client::handlePing(cstr_t &status, NetworkEvent *e)
+void ClientIRC::handlePing(cstr_t &status, NetworkEvent *e)
 {
 	//VERBOSE("PONG!");
 	sendRaw("PONG " + e->text);
 }
 
-void Client::handleAuthentication(cstr_t &status, NetworkEvent *e)
+void ClientIRC::handleAuthentication(cstr_t &status, NetworkEvent *e)
 {
 	if (m_auth_status == AS_SEND_NICK) {
 		LOG("Auth with nick: " << m_nickname);
@@ -402,7 +412,7 @@ void Client::handleAuthentication(cstr_t &status, NetworkEvent *e)
 	}
 }
 
-void Client::handleServerMessage(cstr_t &status, NetworkEvent *e)
+void ClientIRC::handleServerMessage(cstr_t &status, NetworkEvent *e)
 {
 	if (status == "353") {
 		// User list
@@ -422,7 +432,7 @@ void Client::handleServerMessage(cstr_t &status, NetworkEvent *e)
 	}
 }
 
-void Client::joinChannels()
+void ClientIRC::joinChannels()
 {
 	if (m_auth_status != AS_JOIN_CHANNELS)
 		return;
@@ -437,37 +447,37 @@ void Client::joinChannels()
 	}
 }
 
-const ClientActionEntry Client::s_actions[] = {
-	{ 0, "ERROR", &Client::handleError },
+const ClientActionEntry ClientIRC::s_actions[] = {
+	{ 0, "ERROR", &ClientIRC::handleError },
 // Init messages and auth
-	{ 1, "001", &Client::handleAuthentication },
-	{ 1, "002", &Client::handleAuthentication },
-	{ 1, "003", &Client::handleAuthentication },
-	{ 1, "396", &Client::handleAuthentication }, // Hostmask changed
-	{ 1, "439", &Client::handleAuthentication },
-	{ 1, "451", &Client::handleAuthentication }, // ERR_NOTREGISTERED
+	{ 1, "001", &ClientIRC::handleAuthentication },
+	{ 1, "002", &ClientIRC::handleAuthentication },
+	{ 1, "003", &ClientIRC::handleAuthentication },
+	{ 1, "396", &ClientIRC::handleAuthentication }, // Hostmask changed
+	{ 1, "439", &ClientIRC::handleAuthentication },
+	{ 1, "451", &ClientIRC::handleAuthentication }, // ERR_NOTREGISTERED
 // Server information and events
-	{ 0, "PING", &Client::handlePing },
-	{ 1, "250", &Client::handleChatMessage }, // User stats
-	{ 1, "251", &Client::handleChatMessage }, // RPL_LUSERCLIENT
-	{ 1, "253", &Client::handleChatMessage }, // RPL_LUSERUNKNOWN
-	{ 1, "255", &Client::handleChatMessage }, // RPL_LUSERME
-	{ 1, "332", &Client::handleChatMessage }, // RPL_TOPIC
-	{ 1, "372", &Client::handleChatMessage }, // RPL_MOTD
-	{ 1, "375", &Client::handleChatMessage }, // RPL_MOTDSTART
-	{ 1, "376", &Client::handleChatMessage }, // RPL_ENDOFMOTD
-	{ 1, "353", &Client::handleServerMessage },  // RPL_NAMREPLY (user list)
-	{ 1, "366", &Client::handleChatMessage },  // RPL_ENDOFNAMES
-// Client/user events
-	{ 1, "JOIN", &Client::handleClientEvent },
-	{ 1, "NICK", &Client::handleClientEvent },
-	{ 1, "KICK", &Client::handleClientEvent },
-	{ 1, "PART", &Client::handleClientEvent },
-	{ 0, "QUIT", &Client::handleClientEvent },
-	{ 1, "MODE",  &Client::handleClientEvent },
-	{ 1, "PRIVMSG", &Client::handleChatMessage },
-	{ 1, "NOTICE",  &Client::handleChatMessage },
-	{ 1, "INVITE", &Client::handleClientEvent },
+	{ 0, "PING", &ClientIRC::handlePing },
+	{ 1, "250", &ClientIRC::handleChatMessage }, // User stats
+	{ 1, "251", &ClientIRC::handleChatMessage }, // RPL_LUSERCLIENT
+	{ 1, "253", &ClientIRC::handleChatMessage }, // RPL_LUSERUNKNOWN
+	{ 1, "255", &ClientIRC::handleChatMessage }, // RPL_LUSERME
+	{ 1, "332", &ClientIRC::handleChatMessage }, // RPL_TOPIC
+	{ 1, "372", &ClientIRC::handleChatMessage }, // RPL_MOTD
+	{ 1, "375", &ClientIRC::handleChatMessage }, // RPL_MOTDSTART
+	{ 1, "376", &ClientIRC::handleChatMessage }, // RPL_ENDOFMOTD
+	{ 1, "353", &ClientIRC::handleServerMessage },  // RPL_NAMREPLY (user list)
+	{ 1, "366", &ClientIRC::handleChatMessage },  // RPL_ENDOFNAMES
+// ClientIRC/user events
+	{ 1, "JOIN", &ClientIRC::handleClientEvent },
+	{ 1, "NICK", &ClientIRC::handleClientEvent },
+	{ 1, "KICK", &ClientIRC::handleClientEvent },
+	{ 1, "PART", &ClientIRC::handleClientEvent },
+	{ 0, "QUIT", &ClientIRC::handleClientEvent },
+	{ 1, "MODE",  &ClientIRC::handleClientEvent },
+	{ 1, "PRIVMSG", &ClientIRC::handleChatMessage },
+	{ 1, "NOTICE",  &ClientIRC::handleChatMessage },
+	{ 1, "INVITE", &ClientIRC::handleClientEvent },
 // Ignore
 	{ 1, "004", nullptr },
 	{ 1, "005", nullptr },

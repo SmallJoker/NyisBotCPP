@@ -13,7 +13,7 @@
 
 class Channel;
 class ChatCommand;
-class Client;
+class IClient;
 class ModuleMgr;
 class Network;
 class Settings;
@@ -38,7 +38,7 @@ protected:
 private:
 	friend struct ModuleInternal;
 	const std::string *m_path = nullptr;
-	Client *m_client = nullptr;
+	IClient *m_client = nullptr;
 };
 
 
@@ -46,7 +46,7 @@ private:
 
 class ModuleMgr : public ICallbackHandler {
 public:
-	ModuleMgr(Client *cli);
+	ModuleMgr(IClient *cli);
 	~ModuleMgr();
 
 	bool loadModules();
@@ -69,5 +69,5 @@ private:
 	std::mutex m_lock;
 	std::set<ModuleInternal *> m_modules;
 	ChatCommand *m_commands = nullptr;
-	Client *m_client;
+	IClient *m_client;
 };

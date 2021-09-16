@@ -14,7 +14,7 @@ UserInstance::UserInstance(cstr_t &name)
 
 // ================= IUserOwner =================
 
-IUserOwner::IUserOwner(Client *cli)
+IUserOwner::IUserOwner(IClient *cli)
 {
 	if (!cli)
 		ERROR("Client must not be NULL");
@@ -79,7 +79,7 @@ bool IUserOwner::removeUser(UserInstance *ui)
 
 // ================= Channel =================
 
-Channel::Channel(cstr_t &name, Client *cli) :
+Channel::Channel(cstr_t &name, IClient *cli) :
 	IUserOwner(cli)
 {
 	if (isPrivate(name))
@@ -102,24 +102,22 @@ Channel::~Channel()
 
 void Channel::say(cstr_t &text)
 {
-	m_client->sendRaw("PRIVMSG " + m_name + " :" + text);
+	m_client->actionSay(this, text);
 }
 
 void Channel::reply(UserInstance *ui, cstr_t &text)
 {
-	// Helpful for new Client types
-	say(ui->nickname + ": " + text);
+	m_client->actionReply(this, ui, text);
 }
 
 void Channel::notice(UserInstance *ui, cstr_t &text)
 {
-	// Some IRC clients show this text in a separate tab... :(
-	m_client->sendRaw("NOTICE " + ui->nickname + " :" + text);
+	m_client->actionNotice(this, ui, text);
 }
 
 void Channel::leave()
 {
-	m_client->sendRaw("PART " + m_name);
+	m_client->actionLeave(this);
 }
 
 

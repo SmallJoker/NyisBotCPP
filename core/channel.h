@@ -7,8 +7,8 @@
 
 //#include <iostream>
 
-class Client;
 class Channel;
+class IClient;
 class IUserOwner;
 
 // This is network-wide
@@ -51,7 +51,7 @@ private:
 
 class IUserOwner {
 public:
-	IUserOwner(Client *cli);
+	IUserOwner(IClient *cli);
 	virtual ~IUserOwner();
 
 	UserInstance *addUser(cstr_t &name);
@@ -62,7 +62,7 @@ public:
 	{ return m_users; }
 
 protected:
-	Client *m_client = nullptr;
+	IClient *m_client = nullptr;
 
 	// Per-user data
 	std::set<UserInstance *> m_users;
@@ -70,7 +70,7 @@ protected:
 
 class Channel : public IUserOwner {
 public:
-	Channel(cstr_t &name, Client *cli);
+	Channel(cstr_t &name, IClient *cli);
 	~Channel();
 
 	cstr_t &getName() const
@@ -85,10 +85,12 @@ public:
 	Containers *getContainers()
 	{ return m_containers; }
 
+	// Wrappers to avoid the inclusion of client.h
 	void say(cstr_t &text);
 	void reply(UserInstance *ui, cstr_t &text);
 	void notice(UserInstance *ui, cstr_t &text);
 	void leave();
+
 private:
 	std::string m_name;
 
@@ -99,7 +101,7 @@ private:
 
 class Network : public ICallbackHandler, public IUserOwner {
 public:
-	Network(Client *cli) : IUserOwner(cli) {}
+	Network(IClient *cli) : IUserOwner(cli) {}
 	~Network();
 
 	void setActiveChannel(cstr_t &name)

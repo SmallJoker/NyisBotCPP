@@ -1,12 +1,12 @@
 #include "core/args_parser.h"
 #include "core/logger.h"
-#include "core/client.h"
+#include "core/client_irc.h" // subject to change
 #include "core/connection.h"
 #include "core/module.h"
 #include "core/settings.h"
 #include "tests/test.h"
 
-static Client *s_cli = nullptr;
+static IClient *s_cli = nullptr;
 
 void exit_main()
 {
@@ -63,7 +63,7 @@ DLL_EXPORT int main(int argc, char *argv[])
 
 	atexit(exit_main);
 
-	s_cli = new Client(&settings_rw);
+	s_cli = new ClientIRC(&settings_rw);
 	if (load_modules) {
 		if (!s_cli->getModuleMgr()->loadModules())
 			exit(EXIT_FAILURE);

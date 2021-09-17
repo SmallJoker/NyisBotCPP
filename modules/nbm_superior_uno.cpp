@@ -1,5 +1,6 @@
 #include "../core/channel.h"
 #include "../core/chatcommand.h"
+#include "../core/client.h"
 #include "../core/module.h"
 #include "../core/settings.h"
 #include "../core/utils.h"
@@ -273,7 +274,7 @@ public:
 				msg.append(" Elo: ").append(player->formatElo(false));
 			}
 			m_channel->say(msg);
-		} else {
+		} else if (has_started) {
 			m_channel->say(ui->nickname + " left this UNO game.");
 		}
 
@@ -367,7 +368,7 @@ public:
 
 	void onChannelLeave(Channel *c)
 	{
-		delete getGame(c);
+		c->getContainers()->remove(this);
 	}
 
 	// Returns whether the game is still active
@@ -440,11 +441,22 @@ public:
 				g->modes = val; // Data loss
 		}
 
-		if (g->checkMode(UnoGame::UM_RANKED) &&
-				ui->account != UserInstance::UAS_LOGGED_IN) {
-			c->notice(ui, "You must be logged in to play ranked UNO");
-			onUserLeave(c, ui);
-			return;
+		if (g->checkMode(UnoGame::UM_RANKED)) {
+			if (ui->account == UserInstance::UAS_LOGGED_IN) {
+				// good
+			} else if (ui->account == UserInstance::UAS_UNKNOWN) {
+				c->notice(ui, "Requested account status.. please retry now.");
+				getClient()->addTodo(ClientTodo {
+					.type = ClientTodo::CTT_STATUS_UPDATE,
+					.status_update_nick = new std::string(ui->nickname)
+				});
+				onUserLeave(c, ui);
+				return;
+			} else {
+				c->notice(ui, "You must be logged in to play ranked UNO");
+				onUserLeave(c, ui);
+				return;
+			}
 		}
 
 		// Add command scope for easier access

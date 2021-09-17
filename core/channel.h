@@ -23,6 +23,7 @@ public:
 
 	// Valid for ACC and STATUS
 	enum UserAccStatus {
+		UAS_PENDING = -2,
 		UAS_UNKNOWN = -1,
 		UAS_NONE = 0,
 		UAS_EXISTS = 1,

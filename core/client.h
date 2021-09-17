@@ -30,7 +30,7 @@ public:
 	void addTodo(ClientTodo && ct);
 	virtual void processTodos() {}
 
-	virtual void sendRaw(cstr_t &text) {} // TODO: remove this
+	virtual void sendRaw(cstr_t &text) const {} // TODO: remove this
 
 	virtual void actionSay(Channel *c, cstr_t &text) {}
 	virtual void actionReply(Channel *c, UserInstance *ui, cstr_t &text) {}
@@ -54,6 +54,7 @@ struct ClientTodo {
 	enum ClientTodoType {
 		CTT_NONE,
 		CTT_RELOAD_MODULE,
+		CTT_STATUS_UPDATE
 	} type = CTT_NONE;
 
 	union {
@@ -61,5 +62,6 @@ struct ClientTodo {
 			std::string *path;
 			bool keep_data;
 		} reload_module;
+		std::string *status_update_nick;
 	};
 };

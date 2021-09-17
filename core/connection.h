@@ -10,8 +10,8 @@ class Connection {
 public:
 	Connection(cstr_t &address, int port);
 	~Connection();
-	
-	bool send(cstr_t &data);
+
+	bool send(cstr_t &data) const;
 	std::string *popRecv();
 
 private:

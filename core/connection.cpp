@@ -50,7 +50,7 @@ Connection::~Connection()
 	curl_global_cleanup();
 }
 
-bool Connection::send(cstr_t &data)
+bool Connection::send(cstr_t &data) const
 {
 	if (data.size() < 255)
 		VERBOSE("<< Sending: " << strtrim(data));

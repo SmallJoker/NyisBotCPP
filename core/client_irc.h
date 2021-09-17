@@ -22,7 +22,7 @@ public:
 	void addTodo(ClientTodo && ct);
 	void processTodos();
 
-	void sendRaw(cstr_t &text);
+	void sendRaw(cstr_t &text) const;
 	void actionSay(Channel *c, cstr_t &text);
 	void actionReply(Channel *c, UserInstance *ui, cstr_t &text);
 	void actionNotice(Channel *c, UserInstance *ui, cstr_t &text);
@@ -41,6 +41,7 @@ private:
 	void handleServerMessage(cstr_t &status, NetworkEvent *e);
 
 	void joinChannels();
+	void requestAccStatus(UserInstance *ui) const;
 
 	Connection *m_con = nullptr;
 	static const ClientActionEntry s_actions[];

@@ -33,7 +33,10 @@ protected:
 	// Avoids inclusion of "client.h" in modules
 	ModuleMgr *getModuleMgr() const;
 	Network *getNetwork() const;
-	void sendRaw(cstr_t &what) const;
+	void sendRaw(cstr_t &what) const; // TODO: remove me
+
+	inline IClient *getClient() const
+	{ return m_client; }
 
 private:
 	friend struct ModuleInternal;

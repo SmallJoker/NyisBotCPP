@@ -81,14 +81,14 @@ void ChatCommand::setScope(Channel *c, const UserInstance *ui, const ChatCommand
 		// Remove all data or single
 		if (ui == nullptr)
 			c->getContainers()->remove(this);
-		else
+		else if (scope)
 			scope->cmds.erase(ui);
 		return;
 	}
 
 	if (!scope) {
 		scope = new UserCmdScopes();
-		c->getContainers()->set(c, scope);
+		c->getContainers()->set(this, scope);
 	}
 
 	VERBOSE("set for " << ui->nickname);

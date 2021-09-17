@@ -84,10 +84,17 @@ void ClientIRC::processTodos()
 				ct.reload_module.keep_data);
 			delete ct.reload_module.path;
 			return;
+		case ClientTodo::CTT_STATUS_UPDATE:
+			UserInstance *ui = m_network->getUser(*ct.status_update_nick);
+			delete ct.status_update_nick;
+
+			if (ui)
+				requestAccStatus(ui);
+			return;
 	}
 }
 
-void ClientIRC::sendRaw(cstr_t &text)
+void ClientIRC::sendRaw(cstr_t &text) const
 {
 	m_con->send(text + '\n');
 }
@@ -232,6 +239,7 @@ void ClientIRC::handleClientEvent(cstr_t &status, NetworkEvent *e)
 
 		UserInstance *ui = c->addUser(e->nickname);
 		ui->hostmask = e->hostmask;
+		requestAccStatus(ui);
 
 		if (e->nickname != m_nickname)
 			m_module_mgr->onUserJoin(c, ui);
@@ -253,7 +261,7 @@ void ClientIRC::handleClientEvent(cstr_t &status, NetworkEvent *e)
 
 		if (what == m_nickname) {
 			// Add and remove user modes
-			apply_user_modes(m_user_modes, e->text);
+			apply_user_modes(m_user_modes, modes);
 
 			// Our mode updated. Auth, if not already done.
 			if (m_auth_status == AS_AUTHENTICATE) {
@@ -272,6 +280,7 @@ void ClientIRC::handleClientEvent(cstr_t &status, NetworkEvent *e)
 		// nick!host NICK :NewNickname
 		UserInstance *ui = m_network->getUser(e->nickname);
 		ui->nickname = e->text;
+		requestAccStatus(ui);
 
 		m_module_mgr->onUserRename(ui, e->nickname);
 		return;
@@ -338,36 +347,41 @@ void ClientIRC::handleChatMessage(cstr_t &status, NetworkEvent *e)
 		os << e->text << std::endl;
 	}
 
+	if (status == "NOTICE") {
+		if (e->nickname != "NickServ")
+			return;
+
+		// Retrieve pending user status requests
+		// STATUS username int
+		auto args = strsplit(e->text);
+		if (args.size() != 3)
+			return;
+
+		int status = -1;
+		std::string *nick = nullptr;
+
+		if (m_auth_type == 1) {
+			if (args[1] == "ACC") {
+				// For IRCd: solanum
+				status = args[2][0] - '0';
+				nick = &args[0];
+			}
+		} else if (m_auth_type == 2) {
+			if (args[0] == "STATUS") {
+				// For IRCd: plexus
+				status = args[2][0] - '0';
+				nick = &args[1];
+			}
+		}
+		VERBOSE(args[0] << "|" << args[1] << " -> " << status);
+
+		UserInstance *ui = nick ? m_network->getUser(*nick) : nullptr;
+		if (ui)
+			ui->account = static_cast<UserInstance::UserAccStatus>(status);
+		return;
+	}
 	if (status == "PRIVMSG") {
 		// nick!host PRIVMSG where :text text
-		if (e->nickname == "NickServ") {
-			// Retrieve pending user status requests
-
-			auto args = strsplit(e->text);
-			int status = -1;
-			std::string *nick = nullptr;
-
-			if (m_auth_type == 1) {
-				if (args[1] == "ACC") {
-					// For IRCd: solanum
-					status = args[2][0] - '0';
-					nick = &args[0];
-				}
-			} else if (m_auth_type == 2) {
-				if (args[0] == "STATUS") {
-					// For IRCd: plexus
-					status = args[2][0] - '0';
-					nick = &args[1];
-				}
-			}
-			if (!nick)
-				return;
-
-			UserInstance *ui = m_network->getUser(*nick);
-			ui->account = static_cast<UserInstance::UserAccStatus>(status);
-			return;
-		}
-
 		cstr_t &channel = e->args[2];
 		if (channel[0] != '#') {
 			WARN("Private message handling is yet not implemented.");
@@ -446,6 +460,21 @@ void ClientIRC::joinChannels()
 
 		sendRaw("JOIN " + chan);
 	}
+}
+
+void ClientIRC::requestAccStatus(UserInstance *ui) const
+{
+	if (ui->account == UserInstance::UserAccStatus::UAS_PENDING)
+		return;
+
+	ui->account = UserInstance::UserAccStatus::UAS_PENDING;
+	std::string text("PRIVMSG NickServ :");
+	if (m_auth_type == 1)
+		text.append("ACC ");
+	else
+		text.append("STATUS ");
+
+	sendRaw(text + ui->nickname);
 }
 
 const ClientActionEntry ClientIRC::s_actions[] = {

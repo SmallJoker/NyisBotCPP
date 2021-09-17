@@ -22,6 +22,8 @@ void test_Client_cleanup()
 static int instances = 0;
 
 struct RefContainer : public IContainer {
+	std::string dump() const { return "RefContainer (test)"; }
+
 	RefContainer()  { instances++; }
 	~RefContainer() { instances--; }
 };

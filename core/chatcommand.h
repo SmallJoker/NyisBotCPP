@@ -25,6 +25,7 @@ public:
 	const ChatCommand *getParent(ChatCommandAction action) const;
 	void remove(IModule *module);
 
+	void setScope(Channel *c, const UserInstance *ui, const ChatCommand *cmd);
 	bool run(Channel *c, UserInstance *ui, std::string &msg) const;
 
 	std::string getList() const;

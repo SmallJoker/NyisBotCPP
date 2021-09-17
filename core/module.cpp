@@ -15,11 +15,20 @@ static std::string NAME_PREFIX("libnbm_");
 
 
 struct ModuleInternal {
+	ModuleInternal(cstr_t &name_, cstr_t &path_) :
+		name(name_), path(path_) {}
+	~ModuleInternal()
+	{
+		if (module) {
+			ERROR("Module not properly deleted");
+		}
+	}
+
 	bool load(IClient *cli);
 	void unload(Network *net);
 
-	void *dll_handle;
-	IModule *module;
+	void *dll_handle = nullptr;
+	IModule *module = nullptr;
 	std::string name;
 	std::string path;
 };
@@ -78,7 +87,9 @@ bool ModuleMgr::loadModules()
 		cut_a += NAME_PREFIX.size();
 		std::string module_name(filename.substr(cut_a, cut_b - cut_a));
 
-		if (!loadSingleModule(module_name, entry.path().string())) {
+		auto mi = new ModuleInternal(module_name, entry.path().string());
+		if (!loadSingleModule(mi)) {
+			delete mi;
 			good = false;
 			break;
 		}
@@ -127,17 +138,10 @@ bool ModuleMgr::reloadModule(std::string name, bool keep_data)
 	Network *net = m_client ? m_client->getNetwork() : nullptr;
 	IModule *expired_ptr = mi->module;
 
-	// Remove all invalid module-registered commands
-	m_commands->remove(mi->module);
+	unloadSingleModule(mi, keep_data);
+	bool ok = loadSingleModule(mi);
 
-	mi->unload(keep_data ? nullptr : net);
-	bool ok = mi->load(m_client);
-
-	if (ok) {
-		mi->module->initCommands(*m_commands);
-		if (m_client)
-			mi->module->onClientReady();
-	} else {
+	if (!ok) {
 		// Well shit. Now it's too late to free the containers
 		keep_data = false;
 		m_modules.erase(mi);
@@ -165,34 +169,44 @@ void ModuleMgr::unloadModules()
 
 	LOG("Unloading modules...");
 
-	Network *net = m_client ? m_client->getNetwork() : nullptr;
-	for (ModuleInternal *mi : m_modules) {
-		mi->unload(net);
+	while (!m_modules.empty()) {
+		ModuleInternal *mi = *m_modules.begin();
+		unloadSingleModule(mi);
+		m_modules.erase(mi);
 		delete mi;
 	}
-	m_modules.clear();
 
 	*m_commands = ChatCommand(nullptr); // reset
 }
 
-bool ModuleMgr::loadSingleModule(cstr_t &module_name, cstr_t &path)
+bool ModuleMgr::loadSingleModule(ModuleInternal *mi)
 {
-	ModuleInternal *mi = new ModuleInternal();
-	mi->name = module_name;
-	mi->path = path;
 	bool ok = mi->load(m_client);
 
 	if (ok) {
+		// std::set has unique keys
 		m_modules.insert(mi);
 
 		mi->module->initCommands(*m_commands);
 		if (m_client)
 			mi->module->onClientReady();
-	} else {
-		delete mi;
 	}
 
 	return ok;
+}
+
+void ModuleMgr::unloadSingleModule(ModuleInternal *mi, bool keep_data)
+{
+	// Remove all invalid module-registered commands
+	Network *net = m_client ? m_client->getNetwork() : nullptr;
+	if (net) {
+		// Remove soon invalid command scopes
+		for (Channel *c : net->getAllChannels())
+			m_commands->setScope(c, nullptr, nullptr);
+	}
+	m_commands->remove(mi->module);
+
+	mi->unload(keep_data ? nullptr : net);
 }
 
 Settings *ModuleMgr::getSettings(IModule *module) const
@@ -284,6 +298,8 @@ bool ModuleMgr::onUserSay(Channel *c, UserInstance *ui, std::string &msg)
 
 bool ModuleInternal::load(IClient *cli)
 {
+	ASSERT(!module, "Not allowing to overwrite module");
+
 	LOG("Loading module " << path);
 	void *handle = dlopen(path.c_str(), RTLD_NOW);
 	if (!handle) {
@@ -313,6 +329,9 @@ bool ModuleInternal::load(IClient *cli)
 
 void ModuleInternal::unload(Network *net)
 {
+	if (!module)
+		return;
+
 	if (net) {
 		// Remove this module data from all locations before the destructor turns invalid
 		for (Channel *c : net->getAllChannels()) {

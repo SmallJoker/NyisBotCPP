@@ -333,7 +333,8 @@ public:
 		uno.add("top",   (ChatCommandAction)&nbm_superior_uno::cmd_top);
 		uno.add("p",     (ChatCommandAction)&nbm_superior_uno::cmd_play);
 		uno.add("d",     (ChatCommandAction)&nbm_superior_uno::cmd_draw);
-		m_commands = &uno;
+		m_commands = &cmd;
+		m_subcmd = &uno;
 	}
 
 	void onClientReady()
@@ -355,6 +356,7 @@ public:
 		if (UnoGame *g = getGame(c)) {
 			UserInstance *old_current = g->current;
 			g->removePlayer(ui);
+			m_commands->setScope(c, ui, nullptr);
 
 			if (processGameUpdate(c)) {
 				if (old_current != g->current)
@@ -409,7 +411,7 @@ public:
 
 	CHATCMD_FUNC(cmd_help)
 	{
-		c->say("Available subcommands: " + m_commands->getList());
+		c->say("Available subcommands: " + m_subcmd->getList());
 	}
 
 	CHATCMD_FUNC(cmd_join)
@@ -445,7 +447,8 @@ public:
 			return;
 		}
 
-		// TODO: Subcommand shortcut
+		// Add command scope for easier access
+		m_commands->setScope(c, ui, m_subcmd);
 
 		std::string text("[UNO] " + std::to_string(g->getPlayerCount()) +
 			" player(s) are waiting for a new UNO game. Modes: ");
@@ -637,6 +640,7 @@ public:
 private:
 	Settings *m_settings = nullptr;
 	ChatCommand *m_commands = nullptr;
+	ChatCommand *m_subcmd = nullptr;
 };
 
 

@@ -3,8 +3,9 @@
 #include "../core/module.h"
 #include "../core/utils.h"
 
-class MyTimebomb : public IContainer {
-public:
+struct MyTimebomb : public IContainer {
+	std::string dump() const { return "MyTimebomb"; }
+
 	void cooldown()
 	{
 		timer = (get_random() % 20) + 50;

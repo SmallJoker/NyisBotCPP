@@ -86,9 +86,6 @@ public:
 
 	CHATCMD_FUNC(cmd_help)
 	{
-		//auto parent = m_commands->getParent((ChatCommandAction)&nbm_builtin::cmd_help);
-		// ^ for subcommand help
-
 		c->say("Available commands: " + m_commands->getList() +
 			", $reload <module> [<keep>], $list, $quit");
 	}

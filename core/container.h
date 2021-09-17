@@ -1,7 +1,7 @@
 #pragma once
 
+#include "types.h"
 #include <map>
-#include <string>
 #include <vector>
 
 class UserInstance;
@@ -22,13 +22,18 @@ public:
 
 
 struct IContainer {
+	IContainer() = default;
 	virtual ~IContainer() {}
+	DISABLE_COPY(IContainer);
+
 	virtual std::string dump() const { return "??"; }
 };
 
 class Containers {
 public:
+	Containers() = default;
 	~Containers();
+	DISABLE_COPY(Containers);
 
 	// Adds a new or replaces an existing container
 	void set(const void *owner, IContainer *data);

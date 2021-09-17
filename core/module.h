@@ -48,6 +48,7 @@ class ModuleMgr : public ICallbackHandler {
 public:
 	ModuleMgr(IClient *cli);
 	~ModuleMgr();
+	DISABLE_COPY(ModuleMgr);
 
 	bool loadModules();
 	bool reloadModule(std::string name, bool keep_data = false);
@@ -63,7 +64,8 @@ public:
 	void onUserRename(UserInstance *ui, cstr_t &old_name);
 	bool onUserSay(Channel *c, UserInstance *ui, std::string &msg);
 private:
-	bool loadSingleModule(cstr_t &module_name, cstr_t &path);
+	bool loadSingleModule(ModuleInternal *mi);
+	void unloadSingleModule(ModuleInternal *mi, bool keep_data = false);
 
 	std::chrono::high_resolution_clock::time_point m_last_step;
 	std::mutex m_lock;

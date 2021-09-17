@@ -30,6 +30,7 @@ class Settings {
 public:
 	Settings(cstr_t &filename, Settings *parent = nullptr, cstr_t &prefix = "");
 	~Settings();
+	DISABLE_COPY(Settings);
 
 	cstr_t &get(cstr_t &key) const;
 	bool set(cstr_t &key, cstr_t &value);

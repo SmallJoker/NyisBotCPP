@@ -35,6 +35,7 @@ bool Containers::remove(const void *owner)
 	if (it == m_data.end())
 		return false;
 
+	VERBOSE(it->second->dump());
 	delete it->second;
 	m_data.erase(it);
 	return true;

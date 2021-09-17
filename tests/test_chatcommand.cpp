@@ -7,7 +7,6 @@ int call_counter = 0;
 
 class MyTestModule : public IModule {
 public:
-
 	void setupCommands(ChatCommand &cmd)
 	{
 		cmd.setMain((ChatCommandAction)&MyTestModule::mainCommand);

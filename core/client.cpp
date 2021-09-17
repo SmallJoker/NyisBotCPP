@@ -13,7 +13,8 @@ IClient::IClient(Settings *settings)
 
 IClient::~IClient()
 {
-	m_settings->syncFileContents();
+	if (m_settings)
+		m_settings->syncFileContents();
 
 	delete m_module_mgr;
 	m_module_mgr = nullptr;

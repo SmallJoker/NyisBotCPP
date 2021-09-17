@@ -16,6 +16,7 @@ class IClient {
 public:
 	IClient(Settings *settings);
 	virtual ~IClient();
+	DISABLE_COPY(IClient);
 
 	virtual void initialize() {}
 

@@ -22,10 +22,10 @@ public:
 
 	void         add(cstr_t &subcmd, ChatCommandAction action, IModule *module = nullptr);
 	ChatCommand &add(cstr_t &subcmd, IModule *module = nullptr);
-	const ChatCommand *getParent(ChatCommandAction action) const;
 	void remove(IModule *module);
 
-	void setScope(Channel *c, const UserInstance *ui, const ChatCommand *cmd);
+	void setScope(Channel *c, const UserInstance *ui);
+	void resetScope(Channel *c, const UserInstance *ui);
 	bool run(Channel *c, UserInstance *ui, std::string &msg) const;
 
 	std::string getList() const;
@@ -33,6 +33,7 @@ public:
 private:
 	ChatCommandAction m_action = nullptr;
 	IModule *m_module;
+	ChatCommand *m_root = nullptr;
 
 	std::map<std::string, ChatCommand> m_subs;
 };

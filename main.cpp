@@ -77,7 +77,7 @@ DLL_EXPORT int main(int argc, char *argv[])
 		s_cli->initialize();
 
 		while (s_cli->run()) {
-			s_cli->processTodos();
+			s_cli->processRequests();
 			SLEEP_MS(20);
 		}
 	}

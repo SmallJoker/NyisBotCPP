@@ -9,7 +9,6 @@ class ModuleMgr;
 class Network;
 class Settings;
 struct ClientActionEntry;
-struct ClientTodo;
 struct NetworkEvent;
 
 class ClientIRC : public IClient {
@@ -19,8 +18,7 @@ public:
 
 	void initialize();
 
-	void addTodo(ClientTodo && ct);
-	void processTodos();
+	void processRequests();
 
 	void sendRaw(cstr_t &text) const;
 	void actionSay(Channel *c, cstr_t &text);

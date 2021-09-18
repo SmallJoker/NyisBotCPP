@@ -61,32 +61,32 @@ void ClientIRC::initialize()
 	sendRaw("PING server");
 }
 
-void ClientIRC::processTodos()
+void ClientIRC::processRequests()
 {
-	if (m_todo.empty())
+	if (m_requests.empty())
 		return;
 
-	ClientTodo ct;
+	ClientRequest cr;
 	{
-		m_todo_lock.lock();
-		std::swap(m_todo.front(), ct);
-		m_todo.pop();
-		m_todo_lock.unlock();
+		m_requests_lock.lock();
+		std::swap(m_requests.front(), cr);
+		m_requests.pop();
+		m_requests_lock.unlock();
 	}
 
-	VERBOSE("Got type " << (int)ct.type);
-	switch (ct.type) {
-		case ClientTodo::CTT_NONE:
+	VERBOSE("Got type " << (int)cr.type);
+	switch (cr.type) {
+		case ClientRequest::RT_NONE:
 			return;
-		case ClientTodo::CTT_RELOAD_MODULE:
+		case ClientRequest::RT_RELOAD_MODULE:
 			m_module_mgr->reloadModule(
-				*ct.reload_module.path,
-				ct.reload_module.keep_data);
-			delete ct.reload_module.path;
+				*cr.reload_module.path,
+				cr.reload_module.keep_data);
+			delete cr.reload_module.path;
 			return;
-		case ClientTodo::CTT_STATUS_UPDATE:
-			UserInstance *ui = m_network->getUser(*ct.status_update_nick);
-			delete ct.status_update_nick;
+		case ClientRequest::RT_STATUS_UPDATE:
+			UserInstance *ui = m_network->getUser(*cr.status_update_nick);
+			delete cr.status_update_nick;
 
 			if (ui)
 				requestAccStatus(ui);

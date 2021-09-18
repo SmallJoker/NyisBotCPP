@@ -100,6 +100,11 @@ Channel::~Channel()
 	m_users.clear();
 }
 
+bool Channel::isValid(UserInstance *ui) const
+{
+	return m_users.find(ui) != m_users.end();
+}
+
 void Channel::say(cstr_t &text)
 {
 	m_client->actionSay(this, text);
@@ -155,15 +160,6 @@ Channel *Network::getChannel(cstr_t &name) const
 	return nullptr;
 }
 
-Channel *Network::getChannel() const
-{
-	for (Channel *it : m_channels) {
-		if (it->getName() == m_last_active_channel)
-			return it;
-	}
-	return nullptr;
-}
-
 bool Network::removeChannel(Channel *c)
 {
 	auto it = m_channels.find(c);
@@ -184,3 +180,7 @@ bool Network::removeChannel(Channel *c)
 	return true;
 }
 
+bool Network::isValid(Channel *c) const
+{
+	return m_channels.find(c) != m_channels.end();
+}

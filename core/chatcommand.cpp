@@ -14,6 +14,8 @@ struct UserCmdScopes : public IContainer {
 ChatCommand::ChatCommand(IModule *module)
 {
 	m_module = module;
+	if (!module)
+		m_root = this;
 }
 
 void ChatCommand::add(cstr_t &subcmd, ChatCommandAction action, IModule *module)
@@ -27,6 +29,7 @@ ChatCommand &ChatCommand::add(cstr_t &subcmd, IModule *module)
 	ASSERT(module || m_module, "ChatCommand instance must be owned by a module");
 
 	auto [it, is_new] = m_subs.insert({subcmd, ChatCommand(module ? module : m_module)});
+	it->second.m_root = m_root;
 
 	if (!is_new) {
 		WARN("Overriding command " << subcmd << "!");
@@ -34,20 +37,6 @@ ChatCommand &ChatCommand::add(cstr_t &subcmd, IModule *module)
 	}
 
 	return it->second;
-}
-
-const ChatCommand *ChatCommand::getParent(ChatCommandAction action) const
-{
-	for (const auto &it : m_subs) {
-		if (it.second.m_action == action)
-			return this;
-
-		const ChatCommand *cmd = it.second.getParent(action);
-		if (cmd)
-			return cmd;
-	}
-
-	return nullptr;
 }
 
 void ChatCommand::remove(IModule *module)
@@ -67,32 +56,38 @@ void ChatCommand::remove(IModule *module)
 	// IMPORTANT: Also clean up setScope() !
 }
 
-void ChatCommand::setScope(Channel *c, const UserInstance *ui, const ChatCommand *cmd)
+void ChatCommand::setScope(Channel *c, const UserInstance *ui)
 {
-	if (m_module) {
-		ERROR("setScope may only be called on the root instance.");
-		return;
-	}
+	ASSERT(m_root, "setScope lack of a root instance.");
 
-	UserCmdScopes *scope = (UserCmdScopes *)c->getContainers()->get(this);
-	if (!cmd) {
-		VERBOSE("remove " << (ui ? "user-specific" : "all"));
-
-		// Remove all data or single
-		if (ui == nullptr)
-			c->getContainers()->remove(this);
-		else if (scope)
-			scope->cmds.erase(ui);
-		return;
-	}
+	UserCmdScopes *scope = (UserCmdScopes *)c->getContainers()->get(m_root);
 
 	if (!scope) {
 		scope = new UserCmdScopes();
-		c->getContainers()->set(this, scope);
+		c->getContainers()->set(m_root, scope);
 	}
 
 	VERBOSE("set for " << ui->nickname);
-	scope->cmds.insert({ ui, cmd });
+	scope->cmds.insert({ ui, this });
+}
+
+void ChatCommand::resetScope(Channel *c, const UserInstance *ui)
+{
+	ASSERT(m_root, "setScope lack of a root instance.");
+
+	UserCmdScopes *scope = (UserCmdScopes *)c->getContainers()->get(m_root);
+	if (!scope)
+		return;
+
+	VERBOSE("remove " << (ui ? "user-specific" : "all"));
+
+	if (ui)
+		scope->cmds.erase(ui);
+
+	// Remove all data or single
+	if (!ui || scope->cmds.empty())
+		c->getContainers()->remove(m_root);
+	return;
 }
 
 bool ChatCommand::run(Channel *c, UserInstance *ui, std::string &msg) const

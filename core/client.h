@@ -1,5 +1,6 @@
 #pragma once
 
+#include "clientrequest.h"
 #include "types.h"
 #include <queue>
 
@@ -10,7 +11,6 @@ class ModuleMgr;
 class Network;
 class Settings;
 class UserInstance;
-struct ClientTodo;
 
 class IClient {
 public:
@@ -27,8 +27,8 @@ public:
 	Network *getNetwork() const
 	{ return m_network; }
 
-	void addTodo(ClientTodo && ct);
-	virtual void processTodos() {}
+	void addRequest(ClientRequest && ct);
+	virtual void processRequests();
 
 	virtual void sendRaw(cstr_t &text) const {} // TODO: remove this
 
@@ -46,22 +46,6 @@ protected:
 	Network *m_network = nullptr;
 	Settings *m_settings = nullptr;
 
-	std::mutex m_todo_lock;
-	std::queue<ClientTodo> m_todo;
-};
-
-struct ClientTodo {
-	enum ClientTodoType {
-		CTT_NONE,
-		CTT_RELOAD_MODULE,
-		CTT_STATUS_UPDATE
-	} type = CTT_NONE;
-
-	union {
-		struct {
-			std::string *path;
-			bool keep_data;
-		} reload_module;
-		std::string *status_update_nick;
-	};
+	std::mutex m_requests_lock;
+	std::queue<ClientRequest> m_requests;
 };

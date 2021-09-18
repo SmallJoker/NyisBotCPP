@@ -1,17 +1,18 @@
 #pragma once
 
+#include "clientrequest.h"
 #include "types.h"
 #include <map>
 #include <vector>
 
 class UserInstance;
 class Channel;
+struct ClientTodo;
 
 class ICallbackHandler {
 public:
 	virtual ~ICallbackHandler() {}
 
-	virtual void onStep(float time) {}
 	virtual void onChannelJoin(Channel *c) {}
 	virtual void onChannelLeave(Channel *c) {}
 	virtual void onUserJoin(Channel *c, UserInstance *ui) {}
@@ -41,7 +42,7 @@ public:
 	bool remove(const void *owner);
 	bool move(const void *old_owner, const void *new_owner);
 
-protected:
+private:
 	std::map<const void *, IContainer *> m_data;
 };
 

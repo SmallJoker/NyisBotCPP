@@ -23,9 +23,14 @@ IClient::~IClient()
 	m_network = nullptr;
 }
 
-void IClient::addTodo(ClientTodo && ct)
+void IClient::addRequest(ClientRequest && ct)
 {
-	m_todo_lock.lock();
-	m_todo.push(std::move(ct));
-	m_todo_lock.unlock();
+	m_requests_lock.lock();
+	m_requests.push(std::move(ct));
+	m_requests_lock.unlock();
+}
+
+void IClient::processRequests()
+{
+	throw std::string("processRequests() must be overloaded by Client class");
 }

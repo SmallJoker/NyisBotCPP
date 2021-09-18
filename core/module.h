@@ -1,5 +1,6 @@
 #pragma once
 
+#include "clientrequest.h"
 #include "container.h"
 #include "types.h"
 #include <set>
@@ -23,8 +24,10 @@ struct ModuleInternal;
 class IModule : public ICallbackHandler {
 public:
 	virtual ~IModule() {}
+	// Extended callbacks
 	virtual void initCommands(ChatCommand &cmd) {}
 	virtual void onClientReady() {}
+	virtual void onStep(float time) {}
 
 	cstr_t &getModulePath()
 	{ return *m_path; }
@@ -34,9 +37,10 @@ protected:
 	ModuleMgr *getModuleMgr() const;
 	Network *getNetwork() const;
 	void sendRaw(cstr_t &what) const; // TODO: remove me
+	void addClientRequest(ClientRequest && cr);
 
-	inline IClient *getClient() const
-	{ return m_client; }
+	//inline IClient *getClient() const
+	//{ return m_client; }
 
 private:
 	friend struct ModuleInternal;

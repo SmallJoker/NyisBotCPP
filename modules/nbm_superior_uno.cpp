@@ -1,6 +1,5 @@
 #include "../core/channel.h"
 #include "../core/chatcommand.h"
-#include "../core/client.h"
 #include "../core/module.h"
 #include "../core/settings.h"
 #include "../core/utils.h"
@@ -164,8 +163,8 @@ class UnoGame : public IContainer {
 public:
 	std::string dump() const { return "UnoGame"; }
 
-	UnoGame(Channel *c, Settings *s) :
-		m_channel(c), m_settings(s)
+	UnoGame(Channel *c, ChatCommand *cmd, Settings *s) :
+		m_channel(c), m_commands(cmd), m_settings(s)
 	{
 		// 0x87
 		modes = UM_RANKED | UM_UPGRADE | UM_STACK_WD4 | UM_STACK_D2;
@@ -173,8 +172,10 @@ public:
 
 	~UnoGame()
 	{
-		for (UserInstance *ui : m_players)
+		for (UserInstance *ui : m_players) {
+			m_commands->resetScope(m_channel, ui);
 			ui->remove(this);
+		}
 
 		if (m_settings)
 			m_settings->syncFileContents();
@@ -238,6 +239,7 @@ public:
 		if (getPlayer(ui))
 			return false;
 
+		m_commands->setScope(m_channel, ui);
 		ui->set(this, new UnoPlayer());
 		m_players.insert(ui);
 		return true;
@@ -274,10 +276,11 @@ public:
 				msg.append(" Elo: ").append(player->formatElo(false));
 			}
 			m_channel->say(msg);
-		} else if (has_started) {
+		} else {
 			m_channel->say(ui->nickname + " left this UNO game.");
 		}
 
+		m_commands->resetScope(m_channel, ui);
 		ui->remove(this);
 		m_players.erase(ui);
 	}
@@ -309,10 +312,17 @@ public:
 
 private:
 	Channel *m_channel;
+	ChatCommand *m_commands;
 	Settings *m_settings;
 	std::set<UserInstance *> m_players;
 
 	int m_initial_player_count;
+};
+
+struct WaitingForAuth {
+	Channel *c;
+	float timeout;
+	std::string msg;
 };
 
 class nbm_superior_uno : public IModule {
@@ -334,8 +344,7 @@ public:
 		uno.add("top",   (ChatCommandAction)&nbm_superior_uno::cmd_top);
 		uno.add("p",     (ChatCommandAction)&nbm_superior_uno::cmd_play);
 		uno.add("d",     (ChatCommandAction)&nbm_superior_uno::cmd_draw);
-		m_commands = &cmd;
-		m_subcmd = &uno;
+		m_commands = &uno;
 	}
 
 	void onClientReady()
@@ -347,9 +356,41 @@ public:
 		m_settings->syncFileContents();
 	}
 
+	void onStep(float time)
+	{
+		if (m_waiting_for_auth.empty())
+			return;
+
+		auto it = m_waiting_for_auth.begin();
+
+		if (getNetwork()->isValid(it->second.c) &&
+				it->second.c->isValid(it->first)) {
+
+			it->second.timeout += time;
+	
+			if (it->first->account == UserInstance::UAS_LOGGED_IN) {
+				m_waiting_for_auth.erase(it);
+				cmd_join(it->second.c, it->first, it->second.msg);
+				return;
+			}
+
+			if (it->second.timeout < 10)
+				return;
+			
+			it->second.c->notice(it->first, "Authentication check failed. Are you logged in?");
+		}
+
+		m_waiting_for_auth.erase(it);
+	}
+
 	inline UnoGame *getGame(Channel *c)
 	{
 		return (UnoGame *)c->getContainers()->get(this);
+	}
+
+	void onChannelLeave(Channel *c)
+	{
+		c->getContainers()->remove(this);
 	}
 
 	void onUserLeave(Channel *c, UserInstance *ui)
@@ -357,18 +398,12 @@ public:
 		if (UnoGame *g = getGame(c)) {
 			UserInstance *old_current = g->current;
 			g->removePlayer(ui);
-			m_commands->setScope(c, ui, nullptr);
 
 			if (processGameUpdate(c)) {
 				if (old_current != g->current)
 					tellGameStatus(c);
 			}
 		}
-	}
-
-	void onChannelLeave(Channel *c)
-	{
-		c->getContainers()->remove(this);
 	}
 
 	// Returns whether the game is still active
@@ -379,8 +414,13 @@ public:
 			return false;
 		if (g->getPlayerCount() >= UnoPlayer::MIN_PLAYERS)
 			return true;
-		if (g->has_started)
+
+		if (g->has_started) {
 			c->say("[UNO] Game ended");
+		} else if (g->getPlayerCount() > 0) {
+			// Not started yet. Wait for players.
+			return false;
+		}
 
 		m_settings->syncFileContents();
 		c->getContainers()->remove(this);
@@ -412,7 +452,7 @@ public:
 
 	CHATCMD_FUNC(cmd_help)
 	{
-		c->say("Available subcommands: " + m_subcmd->getList());
+		c->say("Available subcommands: " + m_commands->getList());
 	}
 
 	CHATCMD_FUNC(cmd_join)
@@ -425,7 +465,7 @@ public:
 
 		bool is_new = (g == nullptr);
 		if (!g) {
-			g = new UnoGame(c, m_settings);
+			g = new UnoGame(c, m_commands, m_settings);
 			c->getContainers()->set(this, g);
 		}
 
@@ -445,11 +485,15 @@ public:
 			if (ui->account == UserInstance::UAS_LOGGED_IN) {
 				// good
 			} else if (ui->account == UserInstance::UAS_UNKNOWN) {
-				c->notice(ui, "Requested account status.. please retry now.");
-				getClient()->addTodo(ClientTodo {
-					.type = ClientTodo::CTT_STATUS_UPDATE,
+				addClientRequest(ClientRequest {
+					.type = ClientRequest::RT_STATUS_UPDATE,
 					.status_update_nick = new std::string(ui->nickname)
 				});
+				m_waiting_for_auth.insert({ui, WaitingForAuth {
+					.c = c,
+					.timeout = 0,
+					.msg = msg
+				}});
 				onUserLeave(c, ui);
 				return;
 			} else {
@@ -458,9 +502,6 @@ public:
 				return;
 			}
 		}
-
-		// Add command scope for easier access
-		m_commands->setScope(c, ui, m_subcmd);
 
 		std::string text("[UNO] " + std::to_string(g->getPlayerCount()) +
 			" player(s) are waiting for a new UNO game. Modes: ");
@@ -650,9 +691,9 @@ public:
 	}
 
 private:
+	std::map<UserInstance *, WaitingForAuth> m_waiting_for_auth;
 	Settings *m_settings = nullptr;
 	ChatCommand *m_commands = nullptr;
-	ChatCommand *m_subcmd = nullptr;
 };
 
 

@@ -83,6 +83,8 @@ public:
 	static bool isPrivate(cstr_t &name)
 	{ return name[0] != '#'; }
 
+	bool isValid(UserInstance *ui) const;
+
 	Containers *getContainers()
 	{ return m_containers; }
 
@@ -105,13 +107,10 @@ public:
 	Network(IClient *cli) : IUserOwner(cli) {}
 	~Network();
 
-	void setActiveChannel(cstr_t &name)
-	{ m_last_active_channel = name; }
-
 	Channel *addChannel(cstr_t &name);
 	Channel *getChannel(cstr_t &name) const;
-	Channel *getChannel() const;
 	bool removeChannel(Channel *c);
+	bool isValid(Channel *c) const;
 
 	std::set<Channel *> &getAllChannels()
 	{ return m_channels; }

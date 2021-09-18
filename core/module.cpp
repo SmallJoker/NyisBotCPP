@@ -51,6 +51,11 @@ void IModule::sendRaw(cstr_t &what) const
 	m_client->sendRaw(what);
 }
 
+void IModule::addClientRequest(ClientRequest && cr)
+{
+	m_client->addRequest(std::move(cr));
+}
+
 
 // ================= ModuleMgr =================
 
@@ -105,8 +110,8 @@ bool ModuleMgr::reloadModule(std::string name, bool keep_data)
 	bool can_lock = m_lock.try_lock();
 	if (!can_lock) {
 		LOG("Delaying module reload");
-		m_client->addTodo(ClientTodo {
-			.type = ClientTodo::CTT_RELOAD_MODULE,
+		m_client->addRequest(ClientRequest {
+			.type = ClientRequest::RT_RELOAD_MODULE,
 			.reload_module = {
 				.path = new std::string(name),
 				.keep_data = keep_data
@@ -202,7 +207,7 @@ void ModuleMgr::unloadSingleModule(ModuleInternal *mi, bool keep_data)
 	if (net) {
 		// Remove soon invalid command scopes
 		for (Channel *c : net->getAllChannels())
-			m_commands->setScope(c, nullptr, nullptr);
+			m_commands->resetScope(c, nullptr);
 	}
 	m_commands->remove(mi->module);
 

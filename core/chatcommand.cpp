@@ -90,7 +90,7 @@ void ChatCommand::resetScope(Channel *c, const UserInstance *ui)
 	return;
 }
 
-bool ChatCommand::run(Channel *c, UserInstance *ui, std::string &msg) const
+bool ChatCommand::run(Channel *c, UserInstance *ui, std::string &msg, bool is_scope) const
 {
 	do {
 		// Main instance only
@@ -107,7 +107,7 @@ bool ChatCommand::run(Channel *c, UserInstance *ui, std::string &msg) const
 
 		// Found a shortcut!
 		std::string subbed(msg.substr(1));
-		if (it->second->run(c, ui, subbed))
+		if (it->second->run(c, ui, subbed, true))
 			return true;
 	} while (0);
 
@@ -126,7 +126,7 @@ bool ChatCommand::run(Channel *c, UserInstance *ui, std::string &msg) const
 	}
 
 	// Show help function if available
-	if (m_module && m_action) {
+	if (m_module && m_action && !is_scope) {
 		(m_module->*m_action)(c, ui, msg);
 		return true;
 	}

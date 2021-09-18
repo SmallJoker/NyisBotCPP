@@ -36,6 +36,7 @@ public:
 	bool set(cstr_t &key, cstr_t &value);
 	bool get(cstr_t &key, SettingType *type) const;
 	bool set(cstr_t &key, SettingType *type);
+	std::vector<std::string> getKeys() const;
 	bool remove(cstr_t &key);
 
 	bool syncFileContents();

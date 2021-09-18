@@ -106,6 +106,21 @@ bool Settings::set(cstr_t &key, SettingType *type)
 	return set(key, type->serialize());
 }
 
+std::vector<std::string> Settings::getKeys() const
+{
+	std::vector<std::string> keys;
+	for (const auto &it : m_settings) {
+		if (m_prefix && it.first.find(*m_prefix) != 0)
+			continue;
+
+		if (m_prefix)
+			keys.push_back(it.first.substr(m_prefix->size()));
+		else
+			keys.push_back(it.first);
+	}
+	return keys;
+}
+
 bool Settings::remove(cstr_t &key)
 {
 	std::string keyp = KEY_RAW(key);

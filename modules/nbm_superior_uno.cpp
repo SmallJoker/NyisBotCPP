@@ -5,6 +5,7 @@
 #include "../core/utils.h"
 #include <algorithm> // std::sort
 #include <cstring>
+#include <queue>
 #include <sstream>
 
 struct Card {
@@ -145,8 +146,24 @@ public:
 
 	std::string formatElo(bool details)
 	{
-		return "stub";
+		std::ostringstream ss;
+		if (details) {
+			ss << m_elo << " Elo, "
+				<< m_wins << " Wins / " << m_losses << " Losses, "
+				<< m_streak << " Streak";
+			return ss.str();
+		}
+
+		ss << m_elo << " (";
+		ss << (m_delta > 0 ? "+" : "") << m_delta;
+		if (m_streak > 1)
+			ss << ", Streak " << m_streak;
+		ss << ")";
+		return ss.str();
 	}
+
+	long getElo() const
+	{ return m_elo; }
 
 	std::vector<Card> cards;
 	static const size_t MIN_PLAYERS = true ? 2 : 1; // Debug mode
@@ -240,7 +257,11 @@ public:
 			return false;
 
 		m_commands->setScope(m_channel, ui);
-		ui->set(this, new UnoPlayer());
+
+		UnoPlayer *p = new UnoPlayer();
+		ui->set(this, p);
+		m_settings->get(ui->nickname, p);
+
 		m_players.insert(ui);
 		return true;
 	}
@@ -276,7 +297,7 @@ public:
 				msg.append(" Elo: ").append(player->formatElo(false));
 			}
 			m_channel->say(msg);
-		} else {
+		} else if (!checkMode(UM_RANKED) || ui->account != UserInstance::UAS_PENDING) {
 			m_channel->say(ui->nickname + " left this UNO game.");
 		}
 
@@ -320,6 +341,7 @@ private:
 };
 
 struct WaitingForAuth {
+	UserInstance *ui;
 	Channel *c;
 	float timeout;
 	std::string msg;
@@ -344,6 +366,8 @@ public:
 		uno.add("top",   (ChatCommandAction)&nbm_superior_uno::cmd_top);
 		uno.add("p",     (ChatCommandAction)&nbm_superior_uno::cmd_play);
 		uno.add("d",     (ChatCommandAction)&nbm_superior_uno::cmd_draw);
+		uno.add("elo",   (ChatCommandAction)&nbm_superior_uno::cmd_elo);
+		uno.add("elotop", (ChatCommandAction)&nbm_superior_uno::cmd_elotop);
 		m_commands = &uno;
 	}
 
@@ -361,26 +385,26 @@ public:
 		if (m_waiting_for_auth.empty())
 			return;
 
-		auto it = m_waiting_for_auth.begin();
+		auto &it = m_waiting_for_auth.front();
 
-		if (getNetwork()->isValid(it->second.c) &&
-				it->second.c->isValid(it->first)) {
+		if (getNetwork()->isValid(it.c) &&
+				it.c->isValid(it.ui)) {
 
-			it->second.timeout += time;
+			it.timeout += time;
 	
-			if (it->first->account == UserInstance::UAS_LOGGED_IN) {
-				m_waiting_for_auth.erase(it);
-				cmd_join(it->second.c, it->first, it->second.msg);
+			if (it.ui->account == UserInstance::UAS_LOGGED_IN) {
+				cmd_join(it.c, it.ui, it.msg);
+				m_waiting_for_auth.pop();
 				return;
 			}
 
-			if (it->second.timeout < 10)
+			if (it.timeout < 3)
 				return;
-			
-			it->second.c->notice(it->first, "Authentication check failed. Are you logged in?");
+
+			it.c->notice(it.ui, "Authentication check failed. Are you logged in?");
 		}
 
-		m_waiting_for_auth.erase(it);
+		m_waiting_for_auth.pop();
 	}
 
 	inline UnoGame *getGame(Channel *c)
@@ -489,11 +513,12 @@ public:
 					.type = ClientRequest::RT_STATUS_UPDATE,
 					.status_update_nick = new std::string(ui->nickname)
 				});
-				m_waiting_for_auth.insert({ui, WaitingForAuth {
+				m_waiting_for_auth.push(WaitingForAuth {
+					.ui = ui,
 					.c = c,
 					.timeout = 0,
 					.msg = msg
-				}});
+				});
 				onUserLeave(c, ui);
 				return;
 			} else {
@@ -690,8 +715,56 @@ public:
 		tellGameStatus(c);
 	}
 
+	CHATCMD_FUNC(cmd_elo)
+	{
+		std::string nick(get_next_part(msg));
+		if (nick.empty())
+			nick = ui->nickname;
+
+		UnoPlayer dummy;
+		if (!m_settings->get(nick, &dummy)) {
+			c->notice(ui, "There is no Elo record");
+			return;
+		}
+
+		c->say("Selected player " + nick + ": " + dummy.formatElo(true));
+	}
+
+	CHATCMD_FUNC(cmd_elotop)
+	{
+		struct Score {
+			const std::string *name;
+			long score;
+		};
+		std::vector<Score> top;
+		auto keys = m_settings->getKeys();
+		UnoPlayer dummy;
+
+		for (auto &k : keys) {
+			if (!m_settings->get(k, &dummy))
+				continue; // wrong format??
+
+			top.push_back(Score {
+				.name = &k,
+				.score = dummy.getElo()
+			});
+		}
+		std::sort(top.begin(), top.end(), [] (auto a, auto b) -> bool {
+			return a.score > b.score;
+		});
+
+		std::ostringstream ss;
+		for (int n = 0; n < 5 && n < top.size(); n++) {
+			if (n > 0)
+				ss << ", ";
+			ss << *top[n].name << " (" << top[n].score << ")";
+		}
+
+		c->say("[UNO] Top 5 leaderboard: " + ss.str());
+	}
+
 private:
-	std::map<UserInstance *, WaitingForAuth> m_waiting_for_auth;
+	std::queue<WaitingForAuth> m_waiting_for_auth;
 	Settings *m_settings = nullptr;
 	ChatCommand *m_commands = nullptr;
 };

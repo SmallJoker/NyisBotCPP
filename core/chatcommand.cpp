@@ -90,11 +90,11 @@ void ChatCommand::resetScope(Channel *c, const UserInstance *ui)
 	return;
 }
 
-bool ChatCommand::run(Channel *c, UserInstance *ui, std::string &msg, bool is_scope) const
+bool ChatCommand::run(Channel *c, UserInstance *ui, std::string msg, bool is_scope) const
 {
 	do {
 		// Main instance only
-		if (m_module)
+		if (m_module || !c)
 			break;
 
 		UserCmdScopes *scope = (UserCmdScopes *)c->getContainers()->get(this);
@@ -121,8 +121,8 @@ bool ChatCommand::run(Channel *c, UserInstance *ui, std::string &msg, bool is_sc
 
 	auto it = m_subs.find(cmd);
 	if (it != m_subs.end()) {
-		it->second.run(c, ui, msg);
-		return true;
+		if (it->second.run(c, ui, msg))
+			return true;
 	}
 
 	// Show help function if available

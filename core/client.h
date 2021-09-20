@@ -19,6 +19,7 @@ public:
 	DISABLE_COPY(IClient);
 
 	virtual void initialize() {}
+	virtual bool run() { return false; }
 
 	Settings *getSettings() const
 	{ return m_settings; }
@@ -27,8 +28,8 @@ public:
 	Network *getNetwork() const
 	{ return m_network; }
 
-	void addRequest(ClientRequest && ct);
-	virtual void processRequests();
+	void addRequest(ClientRequest && cr);
+	void processRequests();
 
 	virtual void sendRaw(cstr_t &text) const {} // TODO: remove this
 
@@ -38,14 +39,14 @@ public:
 	virtual void actionJoin(cstr_t &channel) {}
 	virtual void actionLeave(Channel *c) {}
 
-	virtual bool run() { return false; }
-
 protected:
+	virtual void processRequest(ClientRequest &cr);
+
 	Logger *m_log = nullptr;
 	ModuleMgr *m_module_mgr = nullptr;
 	Network *m_network = nullptr;
 	Settings *m_settings = nullptr;
 
-	std::mutex m_requests_lock;
+	mutable std::mutex m_requests_lock;
 	std::queue<ClientRequest> m_requests;
 };

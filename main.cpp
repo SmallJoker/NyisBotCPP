@@ -1,17 +1,22 @@
 #include "core/args_parser.h"
 #include "core/logger.h"
 #include "core/client_irc.h" // subject to change
+#include "core/client_tui.h" // subject to change
 #include "core/connection.h"
 #include "core/module.h"
 #include "core/settings.h"
 #include "tests/test.h"
 
 static IClient *s_cli = nullptr;
+static Settings *settings_ro = nullptr;
+static Settings *settings_rw = nullptr;
 
 void exit_main()
 {
 	LOG("Shutting down...");
 	delete s_cli;
+	delete settings_rw;
+	delete settings_ro;
 	delete g_logger;
 	SLEEP_MS(100);
 }
@@ -25,6 +30,7 @@ DLL_EXPORT int main(int argc, char *argv[])
 	bool run_client = true;
 	bool run_unittest = false;
 	bool load_modules = true;
+	bool use_tui = false;
 	bool verbose = false;
 	std::string logfile("debug.txt");
 	std::string config_type("user");
@@ -34,6 +40,7 @@ DLL_EXPORT int main(int argc, char *argv[])
 	CLIArg("logfile",    &logfile);
 	CLIArg("quicktest",  &run_client);
 	CLIArg("unittest",   &run_unittest);
+	CLIArg("tui",        &use_tui);
 	CLIArg("verbose",    &verbose);
 	CLIArg::parseArgs(argc, argv);
 
@@ -60,14 +67,18 @@ DLL_EXPORT int main(int argc, char *argv[])
 		getchar();
 	}
 
-	Settings settings_ro("config/main.defaults.conf", nullptr);
-	Settings settings_rw("config/main." + config_type + ".conf", &settings_ro);
-	settings_ro.syncFileContents();
-	settings_rw.syncFileContents();
+	settings_ro = new Settings("config/main.defaults.conf", nullptr);
+	settings_rw = new Settings("config/main." + config_type + ".conf", settings_ro);
+	settings_ro->syncFileContents();
+	settings_rw->syncFileContents();
 
 	atexit(exit_main);
 
-	s_cli = new ClientIRC(&settings_rw);
+	if (use_tui)
+		s_cli = new ClientTUI(settings_rw);
+	else
+		s_cli = new ClientIRC(settings_rw);
+
 	if (load_modules) {
 		if (!s_cli->getModuleMgr()->loadModules())
 			exit(EXIT_FAILURE);

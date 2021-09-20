@@ -21,10 +21,10 @@ void test_Utils_strops()
 	TEST_CHECK(part == "bar");
 	TEST_CHECK(leftover == "covfefe   ");
 
-	leftover = "foo";
+	leftover = "foo baz";
 	part = get_next_part(leftover);
 	TEST_CHECK(part == "foo");
-	TEST_CHECK(leftover == "");
+	TEST_CHECK(leftover == "baz");
 }
 
 void test_Utils_irc_stuff()

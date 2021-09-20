@@ -17,17 +17,18 @@ public:
 	~ClientIRC();
 
 	void initialize();
-
-	void processRequests();
+	bool run();
 
 	void sendRaw(cstr_t &text) const;
+	// Functions for Channel
 	void actionSay(Channel *c, cstr_t &text);
 	void actionReply(Channel *c, UserInstance *ui, cstr_t &text);
 	void actionNotice(Channel *c, UserInstance *ui, cstr_t &text);
 	void actionJoin(cstr_t &channel);
 	void actionLeave(Channel *c);
 
-	bool run();
+protected:
+	void processRequest(ClientRequest &cr);
 
 private:
 	void handleUnknown(cstr_t &msg);

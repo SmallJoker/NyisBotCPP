@@ -24,7 +24,7 @@ private:
 
 	pthread_t m_thread = 0;
 	std::queue<std::string> m_recv_queue;
-	std::mutex m_recv_queue_lock;
+	mutable std::mutex m_recv_queue_lock;
 	void *m_curl;
 	bool m_is_alive = false;
 };

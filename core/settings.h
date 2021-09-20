@@ -42,7 +42,7 @@ public:
 	bool syncFileContents();
 
 private:
-	std::mutex m_lock;
+	mutable std::mutex m_lock;
 
 	std::string m_file;
 	Settings *m_parent = nullptr;

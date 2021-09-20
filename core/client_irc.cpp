@@ -61,20 +61,10 @@ void ClientIRC::initialize()
 	sendRaw("PING server");
 }
 
-void ClientIRC::processRequests()
+void ClientIRC::processRequest(ClientRequest &cr)
 {
-	if (m_requests.empty())
-		return;
-
-	ClientRequest cr;
-	{
-		m_requests_lock.lock();
-		std::swap(m_requests.front(), cr);
-		m_requests.pop();
-		m_requests_lock.unlock();
-	}
-
 	VERBOSE("Got type " << (int)cr.type);
+
 	switch (cr.type) {
 		case ClientRequest::RT_NONE:
 			return;

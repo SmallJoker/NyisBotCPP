@@ -26,7 +26,7 @@ public:
 
 	void setScope(Channel *c, const UserInstance *ui);
 	void resetScope(Channel *c, const UserInstance *ui);
-	bool run(Channel *c, UserInstance *ui, std::string &msg, bool is_scope = false) const;
+	bool run(Channel *c, UserInstance *ui, std::string msg, bool is_scope = false) const;
 
 	std::string getList() const;
 

@@ -7,15 +7,16 @@ int call_counter = 0;
 
 class MyTestModule : public IModule {
 public:
-	void setupCommands(ChatCommand &cmd)
+	void setupCommands(ChatCommand &cmd, bool assign_main)
 	{
-		cmd.setMain((ChatCommandAction)&MyTestModule::mainCommand);
+		if (assign_main)
+			cmd.setMain((ChatCommandAction)&MyTestModule::mainCommand);
 		cmd.add("!help", (ChatCommandAction)&MyTestModule::normalCommand);
 	}
 
 	bool normalCommand(Channel *c, UserInstance *ui, std::string msg)
 	{
-		call_counter++;
+		call_counter += 10;
 		return true;
 	}
 
@@ -29,26 +30,31 @@ public:
 void test_Chatcommand_simple()
 {
 	MyTestModule mymod;
-	std::string msg("!foo bar baz");
+	call_counter = 0;
 
 	{
 		ChatCommand cmd(&mymod);
-		mymod.setupCommands(cmd);
+		mymod.setupCommands(cmd, true);
 		TEST_CHECK(cmd.getList().size() > 0);
 
-		// Executes main command
-		TEST_CHECK(cmd.run(nullptr, nullptr, msg) == true);
+		// Executes main command -> -1
+		TEST_CHECK(cmd.run(nullptr, nullptr, "!foo bar baz") == true);
 		TEST_CHECK(call_counter == -1);
-		msg = "!help";
-		TEST_CHECK(cmd.run(nullptr, nullptr, msg) == true);
+
+		// Execute valid "!help" command -> 9
+		TEST_CHECK(cmd.run(nullptr, nullptr, "!help") == true);
+		TEST_CHECK(call_counter == 9);
 		cmd.remove(&mymod);
 		TEST_CHECK(cmd.getList().size() == 0);
 	}
 	{
+		// Without main command
 		ChatCommand cmd(&mymod);
-		mymod.setupCommands(cmd);
-		TEST_CHECK(cmd.run(nullptr, nullptr, msg) == true);
-		TEST_CHECK(call_counter == -1);
+		mymod.setupCommands(cmd, false);
+		TEST_CHECK(cmd.run(nullptr, nullptr, "!help") == true);
+		TEST_CHECK(call_counter == 19);
+		// Unhandled case
+		TEST_CHECK(cmd.run(nullptr, nullptr, "!invalid") == false);
 	}
 }
 

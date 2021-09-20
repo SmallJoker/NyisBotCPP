@@ -41,6 +41,7 @@ public:
 	IContainer *get(const void *owner) const;
 	bool remove(const void *owner);
 	bool move(const void *old_owner, const void *new_owner);
+	inline size_t size() const { return m_data.size(); }
 
 private:
 	std::map<const void *, IContainer *> m_data;

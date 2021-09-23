@@ -72,15 +72,14 @@ void ClientIRC::processRequest(ClientRequest &cr)
 			m_module_mgr->reloadModule(
 				*cr.reload_module.path,
 				cr.reload_module.keep_data);
-			delete cr.reload_module.path;
 			return;
 		case ClientRequest::RT_STATUS_UPDATE:
 			UserInstance *ui = m_network->getUser(*cr.status_update_nick);
-			delete cr.status_update_nick;
 
 			if (ui)
 				requestAccStatus(ui);
 			return;
+		//default: return;
 	}
 }
 

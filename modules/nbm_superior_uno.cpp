@@ -23,7 +23,7 @@ struct Card {
 		for (const Card &c : cards)
 			ss << colorize_string("\x02[" + std::string(c.face) + "] ", c.color);
 
-		ss << "\x0F "; // Normal text
+		ss << "\x0F"; // Normal text
 		return ss.str();
 	}
 
@@ -168,7 +168,7 @@ public:
 	std::vector<Card> cards;
 	static const size_t MIN_PLAYERS = true ? 2 : 1; // Debug mode
 private:
-	static const int GAIN_FACTOR = 30;
+	static const int GAIN_FACTOR = 20;
 	long m_wins = 0,
 		m_losses = 0,
 		m_streak = 0,
@@ -321,6 +321,8 @@ public:
 		m_initial_player_count = m_players.size();
 		current = *m_players.begin();
 		top_card = getPlayer(current)->cards[0];
+
+		turnNext();
 		return true;
 	}
 

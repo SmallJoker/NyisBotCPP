@@ -1,24 +1,28 @@
 #include "../core/channel.h"
 #include "../core/chatcommand.h"
 #include "../core/module.h"
+#include "../core/settings.h"
 #include "../core/utils.h"
 #include <algorithm> // std::sort
 #include <iostream>
+#include <random>
 #include <sstream>
 
 // Per-channel-member
 struct LPlayer : public IContainer {
-	static std::string format(const std::vector<const char *> &cards)
+	static std::string format(const std::vector<const char *> &cards, bool include_index = false)
 	{
 		std::ostringstream ss;
-		ss << "\x0F"; // Normal text + Bold start
-		for (const char *c : cards) {
-			std::string str("\x02[" + std::string(c) + "] ");
+		ss << "\x0F"; // Normal text
+		for (size_t i = 0; i < cards.size(); ++i) {
+			if (include_index)
+				ss << i;
 
-			if (*c == 'Q') // Red queens
-				ss << colorize_string(str, IC_RED);
+			std::string inner("[" + std::string(cards[i]) + "]");
+			if (*(cards[i]) == 'Q') // Red queens
+				ss << colorize_string(inner, IC_RED);
 			else // All other cards
-				ss << str;
+				ss << inner;
 		}
 
 		ss << "\x0F"; // Normal text
@@ -27,7 +31,7 @@ struct LPlayer : public IContainer {
 
 	static void shuffle(std::vector<const char *> &cards)
 	{
-		// TODO, stub
+		std::random_shuffle(cards.begin(), cards.end());
 	}
 
 	std::vector<const char *> cards;
@@ -80,6 +84,22 @@ public:
 		m_commands->resetScope(m_channel, ui);
 		ui->remove(this);
 		m_players.erase(ui);
+
+		if (ui == current)
+			turnNext();
+	}
+
+	UserInstance *getPrevPlayer()
+	{
+		if (m_players.size() == 0)
+			return nullptr;
+
+		auto it = m_players.find(current);
+		if (it == m_players.begin()) {
+			it = m_players.end();
+			it--;
+		}
+		return *it;
 	}
 
 	void turnNext()
@@ -96,8 +116,8 @@ public:
 		current = *it;
 	}
 
-	size_t getPlayerCount() const
-	{ return m_players.size(); }
+	const std::set<UserInstance *> &getAllPlayers() const
+	{ return m_players; }
 
 	bool start()
 	{
@@ -133,13 +153,15 @@ public:
 		return true;
 	}
 
-	bool has_started = false;
-	UserInstance *current = nullptr;
-	std::vector<const char *> top_cards;
-
-private:
 	static const size_t MIN_PLAYERS = 3;
 
+	bool has_started = false;
+	UserInstance *current = nullptr;
+	std::vector<const char *> stack;
+	const char *main_face = nullptr;
+	size_t stack_last = 0;
+
+private:
 	std::set<UserInstance *> m_players;
 	Channel *m_channel;
 	ChatCommand *m_commands;
@@ -150,12 +172,375 @@ public:
 	nbm_liar_game()
 	{
 	}
+
+	void initCommands(ChatCommand &cmd)
+	{
+		ChatCommand &lcmd = cmd.add("$lgame", this);
+		lcmd.add("join",  (ChatCommandAction)&nbm_liar_game::cmd_join, this);
+		lcmd.add("leave", (ChatCommandAction)&nbm_liar_game::cmd_leave, this);
+		lcmd.add("start", (ChatCommandAction)&nbm_liar_game::cmd_start, this);
+		lcmd.add("add",   (ChatCommandAction)&nbm_liar_game::cmd_add, this);
+		lcmd.add("check", (ChatCommandAction)&nbm_liar_game::cmd_check, this);
+		lcmd.add("cards", (ChatCommandAction)&nbm_liar_game::cmd_cards, this);
+		m_command = &lcmd;
+	}
+
+	inline LGame *getGame(Channel *c)
+	{
+		return (LGame *)c->getContainers()->get(this);
+	}
+
+	void onUserLeave(Channel *c, UserInstance *ui)
+	{
+		LGame *g = getGame(c);
+		if (!g || !g->getPlayer(ui))
+			return;
+
+		g->removePlayer(ui);
+		tellGameStatus(c);
+	}
+
+	void onChannelLeave(Channel *c)
+	{
+		c->getContainers()->remove(this);
+	}
+
+	void tellGameStatus(Channel *c)
+	{
+		LGame *g = getGame(c);
+		if (!g->has_started || g->stack.empty())
+			return;
+
+		UserInstance *ui = g->current;
+		// Normal ongoing game
+		std::ostringstream ss;
+
+		ss << "[LGame] Main card: " << LPlayer::format({ g->main_face });
+		ss << ", Stack height: " << g->stack.size();
+		ss << ". Current player: " << ui->nickname;
+
+		c->say(ss.str());
+		c->reply(ui, LPlayer::format(g->getPlayer(ui)->cards, true));
+	}
+
+	// Returns true if the player finished
+	bool updateCardsWin(Channel *c, UserInstance *ui, bool played_card)
+	{
+		LGame *g = getGame(c);
+		if (!g || !g->has_started)
+			return false;
+
+		LPlayer *p = g->getPlayer(ui);
+		if (!p)
+			return false;
+
+		size_t amount = p->cards.size();
+		if (amount == 0) {
+			// Done!
+			if (ui == g->current) {
+				c->say(ui->nickname + " has no cards left. Congratulations, you're a winner!");
+				return true;
+			} else if (played_card) {
+				c->say(ui->nickname + " played " + colorize_string("their last card", IC_ORANGE) + "!");
+			}
+			return false;
+		}
+		if (amount >= 4) {
+			// Sum all face types for discarding
+			std::map<const char *, int> cards;
+			for (const char *c : p->cards) {
+				if (cards.find(c) != cards.end())
+					cards[c]++;
+				else
+					cards[c] = 1;
+			}
+
+			// Discard if all four were collected
+			std::vector<const char *> discarded;
+			for (auto &card : cards) {
+				if (card.second >= 4) {
+					std::remove_if(p->cards.begin(), p->cards.end(),
+							[card] (auto &d) -> bool {
+						return d == card.first;
+					});
+					discarded.emplace_back(card.first);
+				}
+			}
+			if (!discarded.empty()) {
+				c->say(ui->nickname + " can discard four " + LPlayer::format(discarded) +
+					" cards. Left cards: " + std::to_string(p->cards.size()));
+
+				// Re-check for win
+				return updateCardsWin(c, ui, false);
+			}
+			return false;
+		}
+
+		if (amount <= LGame::MIN_PLAYERS && ui == g->current) {
+			c->say(ui->nickname + " has " +
+				colorize_string("only " + std::to_string(amount) + " cards", IC_ORANGE) + " left!");
+		}
+		return false;
+	}
+
+	bool processGameUpdate(Channel *c)
+	{
+		LGame *g = getGame(c);
+		if (!g)
+			return false;
+		if (g->getAllPlayers().size() >= LGame::MIN_PLAYERS)
+			return true;
+
+		if (g->has_started) {
+			c->say("[LGame] Game ended");
+		} else if (!g->getAllPlayers().empty()) {
+			// Not started yet. Wait for players.
+			return false;
+		}
+
+		c->getContainers()->remove(this);
+		return false;
+	}
+
+	CHATCMD_FUNC(cmd_join)
+	{
+		LGame *g = getGame(c);
+		if (g && g->has_started) {
+			c->reply(ui, "Please wait for " + g->current->nickname + " to finish their game.");
+			return;
+		}
+
+		if (!g) {
+			g = new LGame(c, m_command);
+			c->getContainers()->set(this, g);
+		}
+
+		if (!g->addPlayer(ui)) {
+			c->reply(ui, "Yes yes I know that you're waiting.");
+			return;
+		}
+
+		size_t count = g->getAllPlayers().size();
+		std::ostringstream ss;
+		ss << "Player " << ui->nickname << " joined the game. Total " << count << " players ready.";
+		if (count >= LGame::MIN_PLAYERS)
+			ss << " If you want to start the game, use \"$start\"";
+		else if (count == 1)
+			ss << " At least " << LGame::MIN_PLAYERS << " players are required to start the game.";
+
+		c->say(ss.str());
+	}
+
+	CHATCMD_FUNC(cmd_leave)
+	{
+		LGame *g = getGame(c);
+		LPlayer *p = g ? g->getPlayer(ui) : nullptr;
+		if (!p || !g->has_started) {
+			c->reply(ui, "There is no game for you to leave");
+			return;
+		}
+
+		onUserLeave(c, ui);
+	}
+
+	CHATCMD_FUNC(cmd_start)
+	{
+		LGame *g = getGame(c);
+		LPlayer *p = g ? g->getPlayer(ui) : nullptr;
+		if (!p || g->has_started) {
+			c->reply(ui, "There is no game for you to start");
+			return;
+		}
+
+		if (!g->start()) {
+			c->say("[LGame] Game start failed. There must be at least "
+				+ std::to_string(LGame::MIN_PLAYERS) + " players waiting.");
+			return;
+		}
+
+		c->say("Game started! Player " + g->current->nickname +
+			" may play the first card using \"$add <'main card'> <card nr.> [<card nr.> [<card nr.>]]\"" +
+			" (Card nr. from your hand)");
+
+		for (UserInstance *ui : g->getAllPlayers())
+			updateCardsWin(c, ui, false);
+
+		c->reply(ui, LPlayer::format(((LPlayer *)ui)->cards, true));
+	}
+
+	CHATCMD_FUNC(cmd_add)
+	{
+		LGame *g = getGame(c);
+		LPlayer *p = g ? g->getPlayer(ui) : nullptr;
+		if (!p || g->has_started) {
+			c->reply(ui, "You are not part of an ongoing game");
+			return;
+		}
+
+		std::string face(get_next_part(msg));
+		for (char &c : face)
+			c = toupper(c);
+
+		const char *face_c = nullptr;
+		for (const char *card : LPlayer::FACES) {
+			if (*card != 'Q' && face == card) {
+				face_c = card;
+				break;
+			}
+		}
+
+		// Empty stack. Specify type
+		if (!face_c) {
+			std::string ret = "Unknown face. Must be one of the following: ";
+			for (const char *card : LPlayer::FACES) {
+				if (*card != 'Q') {
+					ret.append(card);
+					ret.append(" ");
+				}
+			}
+			c->reply(ui, ret);
+			return;
+		}
+
+		if (g->stack.empty()) {
+			g->main_face = face_c;
+		} else {
+			// Validate
+			if (face_c != g->main_face) {
+				c->reply(ui, "Wrong card type! Please pretend to place a card of type " +
+					LPlayer::format({ g->main_face }));
+				return;
+			}
+		}
+
+		// Face is specified. Add cards.
+		std::set<size_t> indices;
+		while (!msg.empty()) {
+			std::string index(get_next_part(msg));
+			long out = -1;
+			if (!SettingType::parseLong(index, &out) ||
+					out > p->cards.size() || out < 1) {
+				c->reply(ui, "Invalid card index \"" + std::to_string(out) +
+					"\". Play one between 1 and " +
+					std::to_string(p->cards.size()) + " from your hand.");
+				return;
+			}
+			indices.insert(out);
+		}
+		if (indices.empty()) {
+			c->reply(ui, "Please specify at least one card index.");
+			return;
+		}
+
+		// "indices" is sorted ascending
+		// Remove in reverse order
+		for (auto it = indices.rbegin(); it != indices.rend(); ++it) {
+			auto c_it = p->cards.begin() + *it;
+			g->stack.emplace_back(*c_it);
+			p->cards.erase(c_it);
+		}
+		g->stack_last = indices.size();
+
+		// Cards added. Update game progress
+		if (updateCardsWin(c, g->current, true))
+			g->removePlayer(g->current);
+		else
+			g->turnNext();
+
+		if (!processGameUpdate(c))
+			return; // Game ended
+
+		tellGameStatus(c);
+	}
+
+	CHATCMD_FUNC(cmd_check)
+	{
+		LGame *g = getGame(c);
+		LPlayer *p = g ? g->getPlayer(ui) : nullptr;
+		if (!p || g->has_started) {
+			c->reply(ui, "You are not part of an ongoing game");
+			return;
+		}
+
+		if (ui != g->current) {
+			c->reply(ui, "It is yet not your turn. Current: " + g->current->nickname);
+			return;
+		}
+
+		if (g->stack.empty()) {
+			c->reply(ui, "There is no stack to check. Please start a new one.");
+			return;
+		}
+
+		bool contains_invalid = true;
+		std::vector<const char *> top_cards(g->stack.rbegin(), g->stack.rbegin() + g->stack_last);
+		for (const char *card : top_cards) {
+			if (card != g->main_face) {
+				contains_invalid = false;
+				break;
+			}
+		}
+
+		std::ostringstream ss;
+		if (contains_invalid) {
+			ss << "One or more top cards were not a [" << g->main_face << ".";
+		} else {
+			ss << "The top cards were correct!";
+
+			g->turnNext();
+		}
+
+		ss << " (" << LPlayer::format(top_cards) << ") ";
+
+		// Previous player draws the cards
+		UserInstance *ui_prev = g->getPrevPlayer();
+		LPlayer *p_prev = g->getPlayer(ui_prev);
+		p_prev->cards.insert(p_prev->cards.end(), g->stack.begin(), g->stack.end());
+
+		g->stack.clear();
+		g->stack_last = 0;
+		g->main_face = nullptr;
+
+		ss << "Complete stack goes to " << ui_prev->nickname << ". ";
+
+		ss << g->current->nickname + " may start with an empty stack.";
+		c->say(ss.str());
+
+		size_t num_players = g->getAllPlayers().size();
+
+		if (updateCardsWin(c, ui_prev, false)) {
+			// User played their last card and it was correct
+			g->removePlayer(ui_prev);
+		} else {
+			c->reply(ui_prev, LPlayer::format(p_prev->cards, true));
+		}
+		if (updateCardsWin(c, ui, false)) {
+			// Obscure win: discard all 4 in the hand
+			g->removePlayer(ui);
+		} else {
+			c->reply(ui, LPlayer::format(p->cards, true));
+		}
+
+		if (processGameUpdate(c))
+			return;
+
+		if (g->getAllPlayers().size() != num_players) {
+			tellGameStatus(c);
+		}
+	}
+
+	CHATCMD_FUNC(cmd_cards)
+	{
+	}
+
+private:
+	ChatCommand *m_command = nullptr;
 };
 
 
 extern "C" {
 	DLL_EXPORT void *nbm_init()
 	{
-		return new nbm_liar_game();
+		return new IModule();//nbm_liar_game();
 	}
 }

@@ -21,6 +21,7 @@ public:
 		cmd.add("quit",   (ChatCommandAction)&TUIhelper::cmd_quit, this);
 		cmd.add("exit",   (ChatCommandAction)&TUIhelper::cmd_quit, this);
 		cmd.add("load",   (ChatCommandAction)&TUIhelper::cmd_load, this);
+		cmd.add("reload", (ChatCommandAction)&TUIhelper::cmd_reload, this);
 
 		ChatCommand &c = cmd.add("channel", this);
 		c.add("list",   (ChatCommandAction)&TUIhelper::cmd_channel_list, this);
@@ -39,6 +40,7 @@ public:
 			"Available commands: \n"
 			"\t quit / exit\n"
 			"\t load <filename> (Execute commands from file)\n"
+			"\t reload <modulename> [<keep_data>]\n"
 			"\t channel list\n"
 			"\t channel add    <name>\n"
 			"\t channel remove <name>\n"
@@ -75,6 +77,13 @@ public:
 			((ClientTUI *)m_client)->m_commands->run(nullptr, nullptr, line);
 		}
 		m_load_locked = false;
+	}
+
+	CHATCMD_FUNC(cmd_reload)
+	{
+		std::string name(get_next_part(msg));
+		bool keep_data = is_yes(msg);
+		getModuleMgr()->reloadModule(name, keep_data);
 	}
 
 	CHATCMD_FUNC(cmd_channel_list)
@@ -189,7 +198,9 @@ public:
 			return;
 		}
 		msg = strtrim(msg);
-		if (!getModuleMgr()->onUserSay(c, ui, msg));
+
+		LoggerAssistant(LL_VERBOSE, nullptr) << "Channel [" << c->getName() << "] " << ui->nickname << ": " << msg;
+		if (!getModuleMgr()->onUserSay(c, ui, msg))
 			sendRaw("Message was not maked as handled.");
 	}
 
@@ -255,12 +266,12 @@ void ClientTUI::actionSay(Channel *c, cstr_t &text)
 
 void ClientTUI::actionReply(Channel *c, UserInstance *ui, cstr_t &text)
 {
-	LoggerAssistant(LL_NORMAL, nullptr) << "Channel [" << c->getName() << "] Reply to " << ui->nickname << ": " << text;
+	LoggerAssistant(LL_NORMAL, nullptr) << "Channel [" << c->getName() << "] Reply -> " << ui->nickname << ": " << text;
 }
 
 void ClientTUI::actionNotice(Channel *c, UserInstance *ui, cstr_t &text)
 {
-	LoggerAssistant(LL_NORMAL, nullptr) << "Channel [" << c->getName() << "] Notice to " << ui->nickname << ": " << text;
+	LoggerAssistant(LL_NORMAL, nullptr) << "Channel [" << c->getName() << "] Notice -> " << ui->nickname << ": " << text;
 }
 
 void ClientTUI::actionJoin(cstr_t &channel)
@@ -288,6 +299,9 @@ void *ClientTUI::inputHandler(void *cli_p)
 		std::cout << "command:# " << std::flush;
 		
 		std::cin.getline(buf, BUFSIZE);
+
+		if (strlen(buf) == 0)
+			continue;
 
 		if (!cli->m_commands->run(nullptr, nullptr, buf, true))
 			std::cout << "Unknown command. Check 'help'." << std::endl;

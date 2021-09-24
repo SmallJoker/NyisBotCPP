@@ -1,0 +1,24 @@
+# This is for the --tui mode
+# ./loader --tui
+# load ../tests/test_nbm_liar_game.txt
+
+reload liar_game yes
+
+channel add #test
+user add FOO #test
+user add BAR #test
+user add ZAP #test
+
+user say FOO #test $lgame join
+user say BAR #test $lgame join
+user say ZAP #test $lgame join
+user say FOO #test $start
+
+user say FOO #test $add A 1 2 3
+user say BAR #test $add A 1
+user say ZAP #test $check
+user say FOO #test $add K 1
+
+user say FOO #test $leave
+user say BAR #test $leave
+user say ZAP #test $leave

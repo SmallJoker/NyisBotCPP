@@ -81,12 +81,6 @@ bool is_yes(std::string what)
 
 int get_random()
 {
-	static thread_local bool init = false;
-	if (!init) {
-		srand(time(nullptr));
-		init = true;
-	}
-
 	return rand();
 }
 

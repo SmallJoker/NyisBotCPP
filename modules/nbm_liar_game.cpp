@@ -10,19 +10,27 @@
 
 // Per-channel-member
 struct LPlayer : public IContainer {
-	static std::string format(const std::vector<const char *> &cards, bool include_index = false)
+	std::string dump() const { return "LPlayer"; }
+
+	static std::string format(const std::vector<const char *> &cards, bool hand_info = false)
 	{
 		std::ostringstream ss;
+		if (hand_info)
+			ss << "Your cards: ";
+
 		ss << "\x0F"; // Normal text
 		for (size_t i = 0; i < cards.size(); ++i) {
-			if (include_index)
-				ss << i;
+			if (hand_info)
+				ss << (i + 1);
 
 			std::string inner("[" + std::string(cards[i]) + "]");
 			if (*(cards[i]) == 'Q') // Red queens
 				ss << colorize_string(inner, IC_RED);
 			else // All other cards
 				ss << inner;
+
+			if (i + 1 < cards.size())
+				ss << ' ';
 		}
 
 		ss << "\x0F"; // Normal text
@@ -31,7 +39,9 @@ struct LPlayer : public IContainer {
 
 	static void shuffle(std::vector<const char *> &cards)
 	{
-		std::random_shuffle(cards.begin(), cards.end());
+		std::random_shuffle(cards.begin(), cards.end(), [] (int i) -> int {
+			return std::rand() % i;
+		});
 	}
 
 	std::vector<const char *> cards;
@@ -40,12 +50,14 @@ struct LPlayer : public IContainer {
 };
 
 const char *LPlayer::FACES[] = {
-	"6", "7", "8", "9", "10", "J", "Q", "K"
+	"6", "7", "8", "9", "10", "J", "Q", "K", "A"
 };
 
 // Per-channel
 class LGame : public IContainer {
 public:
+	std::string dump() const { return "LGame"; }
+
 	LGame(Channel *c, ChatCommand *cmd) :
 		m_channel(c), m_commands(cmd) {}
 
@@ -95,10 +107,9 @@ public:
 			return nullptr;
 
 		auto it = m_players.find(current);
-		if (it == m_players.begin()) {
+		if (it == m_players.begin())
 			it = m_players.end();
-			it--;
-		}
+		it--;
 		return *it;
 	}
 
@@ -144,7 +155,7 @@ public:
 			getPlayer(*p_it)->cards.emplace_back(*c_it);
 
 			if (++p_it == m_players.end())
-				p_it = m_players.end();
+				p_it = m_players.begin();
 			c_it++;
 		}
 
@@ -153,7 +164,7 @@ public:
 		return true;
 	}
 
-	static const size_t MIN_PLAYERS = 3;
+	static const size_t MIN_PLAYERS = 1;
 
 	bool has_started = false;
 	UserInstance *current = nullptr;
@@ -197,7 +208,9 @@ public:
 			return;
 
 		g->removePlayer(ui);
-		tellGameStatus(c);
+		if (processGameUpdate(c)) {
+			tellGameStatus(c);
+		}
 	}
 
 	void onChannelLeave(Channel *c)
@@ -212,6 +225,9 @@ public:
 			return;
 
 		UserInstance *ui = g->current;
+		if (!ui)
+			return;
+
 		// Normal ongoing game
 		std::ostringstream ss;
 
@@ -259,10 +275,10 @@ public:
 			std::vector<const char *> discarded;
 			for (auto &card : cards) {
 				if (card.second >= 4) {
-					std::remove_if(p->cards.begin(), p->cards.end(),
-							[card] (auto &d) -> bool {
+					p->cards.erase(std::remove_if(p->cards.begin(), p->cards.end(),
+							[card] (const char *d) -> bool {
 						return d == card.first;
-					});
+					}), p->cards.end());
 					discarded.emplace_back(card.first);
 				}
 			}
@@ -358,22 +374,28 @@ public:
 			return;
 		}
 
-		c->say("Game started! Player " + g->current->nickname +
+		ui = g->current;
+		c->say("Game started! Player " + ui->nickname +
 			" may play the first card using \"$add <'main card'> <card nr.> [<card nr.> [<card nr.>]]\"" +
 			" (Card nr. from your hand)");
 
 		for (UserInstance *ui : g->getAllPlayers())
 			updateCardsWin(c, ui, false);
 
-		c->reply(ui, LPlayer::format(((LPlayer *)ui)->cards, true));
+		c->reply(ui, LPlayer::format(g->getPlayer(ui)->cards, true));
 	}
 
 	CHATCMD_FUNC(cmd_add)
 	{
 		LGame *g = getGame(c);
 		LPlayer *p = g ? g->getPlayer(ui) : nullptr;
-		if (!p || g->has_started) {
+		if (!p || !g->has_started) {
 			c->reply(ui, "You are not part of an ongoing game");
+			return;
+		}
+
+		if (ui != g->current) {
+			c->reply(ui, "It is yet not your turn. Current: " + g->current->nickname);
 			return;
 		}
 
@@ -425,7 +447,7 @@ public:
 					std::to_string(p->cards.size()) + " from your hand.");
 				return;
 			}
-			indices.insert(out);
+			indices.insert(out - 1);
 		}
 		if (indices.empty()) {
 			c->reply(ui, "Please specify at least one card index.");
@@ -442,8 +464,8 @@ public:
 		g->stack_last = indices.size();
 
 		// Cards added. Update game progress
-		if (updateCardsWin(c, g->current, true))
-			g->removePlayer(g->current);
+		if (updateCardsWin(c, ui, true))
+			g->removePlayer(ui);
 		else
 			g->turnNext();
 
@@ -457,7 +479,7 @@ public:
 	{
 		LGame *g = getGame(c);
 		LPlayer *p = g ? g->getPlayer(ui) : nullptr;
-		if (!p || g->has_started) {
+		if (!p || !g->has_started) {
 			c->reply(ui, "You are not part of an ongoing game");
 			return;
 		}
@@ -472,18 +494,18 @@ public:
 			return;
 		}
 
-		bool contains_invalid = true;
+		bool contains_invalid = false;
 		std::vector<const char *> top_cards(g->stack.rbegin(), g->stack.rbegin() + g->stack_last);
 		for (const char *card : top_cards) {
 			if (card != g->main_face) {
-				contains_invalid = false;
+				contains_invalid = true;
 				break;
 			}
 		}
 
 		std::ostringstream ss;
 		if (contains_invalid) {
-			ss << "One or more top cards were not a [" << g->main_face << ".";
+			ss << "One or more top cards were not a [" << g->main_face << "].";
 		} else {
 			ss << "The top cards were correct!";
 
@@ -506,7 +528,10 @@ public:
 		ss << g->current->nickname + " may start with an empty stack.";
 		c->say(ss.str());
 
+		// Show newest game status
 		size_t num_players = g->getAllPlayers().size();
+		ui = g->current;
+		p = g->getPlayer(ui);
 
 		if (updateCardsWin(c, ui_prev, false)) {
 			// User played their last card and it was correct
@@ -521,7 +546,7 @@ public:
 			c->reply(ui, LPlayer::format(p->cards, true));
 		}
 
-		if (processGameUpdate(c))
+		if (!processGameUpdate(c))
 			return;
 
 		if (g->getAllPlayers().size() != num_players) {
@@ -531,6 +556,15 @@ public:
 
 	CHATCMD_FUNC(cmd_cards)
 	{
+		LGame *g = getGame(c);
+		LPlayer *p = g ? g->getPlayer(ui) : nullptr;
+		if (!p || !g->has_started) {
+			c->reply(ui, "You are not part of an ongoing game");
+			return;
+		}
+
+		p->shuffle(p->cards);
+		c->reply(ui, LPlayer::format(p->cards, true));
 	}
 
 private:
@@ -541,6 +575,6 @@ private:
 extern "C" {
 	DLL_EXPORT void *nbm_init()
 	{
-		return new IModule();//nbm_liar_game();
+		return new nbm_liar_game();
 	}
 }

@@ -240,10 +240,9 @@ public:
 			if (++it == m_players.end())
 				it = m_players.begin();
 		} else {
-			if (it == m_players.begin()) {
+			if (it == m_players.begin())
 				it = m_players.end();
-				it--;
-			}
+			it--;
 		}
 		current = *it;
 	}

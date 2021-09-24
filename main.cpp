@@ -29,14 +29,16 @@ DLL_EXPORT int main(int argc, char *argv[])
 
 	bool run_client = true;
 	bool run_unittest = false;
-	bool load_modules = true;
+	bool no_modules = false;
+	bool no_random = false;
 	bool use_tui = false;
 	bool verbose = false;
 	std::string logfile("debug.txt");
 	std::string config_type("user");
 
 	CLIArg("config",     &config_type);
-	CLIArg("no-modules", &load_modules);
+	CLIArg("no-modules", &no_modules);
+	CLIArg("no-random",  &no_random);
 	CLIArg("logfile",    &logfile);
 	CLIArg("quicktest",  &run_client);
 	CLIArg("unittest",   &run_unittest);
@@ -74,12 +76,15 @@ DLL_EXPORT int main(int argc, char *argv[])
 
 	atexit(exit_main);
 
+	if (!no_random)
+		std::srand(std::time(nullptr));
+
 	if (use_tui)
 		s_cli = new ClientTUI(settings_rw);
 	else
 		s_cli = new ClientIRC(settings_rw);
 
-	if (load_modules) {
+	if (!no_modules) {
 		if (!s_cli->getModuleMgr()->loadModules())
 			exit(EXIT_FAILURE);
 	}

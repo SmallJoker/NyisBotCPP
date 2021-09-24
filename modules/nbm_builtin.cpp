@@ -46,6 +46,9 @@ public:
 			return false;
 
 		if (cmd == "$reload") {
+			if (!isBotAdmin(c, ui))
+				return true;
+
 			std::string module(get_next_part(msg));
 			std::string keep(get_next_part(msg));
 
@@ -54,6 +57,9 @@ public:
 			return true;
 		}
 		if (cmd == "$quit") {
+			if (!isBotAdmin(c, ui))
+				return true;
+
 			sendRaw("QUIT :Goodbye!");
 			return true;
 		}
@@ -66,7 +72,24 @@ public:
 			c->say(list);
 			return true;
 		}
+		if (cmd == "$updateauth") {
+			addClientRequest(ClientRequest {
+				.type = ClientRequest::RT_STATUS_UPDATE,
+				.status_update_nick = new std::string(ui->nickname)
+			});
+			return true;
+		}
 
+		return false;
+	}
+
+	bool isBotAdmin(Channel *c, UserInstance *ui)
+	{
+		cstr_t &admin = getModuleMgr()->getGlobalSettings()->get("client.admin");
+		if (ui->nickname == admin && ui->account == UserInstance::UAS_LOGGED_IN)
+			return true;
+
+		c->reply(ui, "Insufficient privileges.");
 		return false;
 	}
 
@@ -87,7 +110,7 @@ public:
 	CHATCMD_FUNC(cmd_help)
 	{
 		c->say("Available commands: " + m_commands->getList() +
-			", $reload <module> [<keep>], $list, $quit");
+			", $reload <module> [<keep>], $list, $quit, $updateauth");
 	}
 
 	CHATCMD_FUNC(cmd_remember)

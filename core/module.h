@@ -61,6 +61,7 @@ public:
 	bool reloadModule(std::string name, bool keep_data = false);
 	void unloadModules();
 	Settings *getSettings(IModule *module) const;
+	Settings *getGlobalSettings() const;
 
 	// Callback handlers
 	void onStep(float time);

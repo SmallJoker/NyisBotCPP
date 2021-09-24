@@ -296,7 +296,9 @@ public:
 				msg.append(" Elo: ").append(player->formatElo(false));
 			}
 			m_channel->say(msg);
-		} else if (!checkMode(UM_RANKED) || ui->account != UserInstance::UAS_PENDING) {
+		} else if (!checkMode(UM_RANKED) || !ui->get(&ui->account)) {
+			// This is a bit hacky. Check whether the account status update
+			// is still ongoing, and give no direct feedback in that case.
 			m_channel->say(ui->nickname + " left this UNO game.");
 		}
 
@@ -394,6 +396,7 @@ public:
 			it.timeout += time;
 	
 			if (it.ui->account == UserInstance::UAS_LOGGED_IN) {
+				it.ui->remove(&it.ui->account); // Auth request pending
 				cmd_join(it.c, it.ui, it.msg);
 				m_waiting_for_auth.pop();
 				return;
@@ -403,6 +406,7 @@ public:
 				return;
 
 			it.c->notice(it.ui, "Authentication check failed. Are you logged in?");
+			it.ui->remove(&it.ui->account); // Auth request pending
 		}
 
 		m_waiting_for_auth.pop();
@@ -520,6 +524,7 @@ public:
 					.timeout = 0,
 					.msg = msg
 				});
+				ui->set(&ui->account, nullptr); // Auth request pending
 				onUserLeave(c, ui);
 				return;
 			} else {

@@ -187,13 +187,14 @@ public:
 	void initCommands(ChatCommand &cmd)
 	{
 		ChatCommand &lcmd = cmd.add("$lgame", this);
+		lcmd.setMain((ChatCommandAction)&nbm_liar_game::cmd_help);
 		lcmd.add("join",  (ChatCommandAction)&nbm_liar_game::cmd_join, this);
 		lcmd.add("leave", (ChatCommandAction)&nbm_liar_game::cmd_leave, this);
 		lcmd.add("start", (ChatCommandAction)&nbm_liar_game::cmd_start, this);
 		lcmd.add("add",   (ChatCommandAction)&nbm_liar_game::cmd_add, this);
 		lcmd.add("check", (ChatCommandAction)&nbm_liar_game::cmd_check, this);
 		lcmd.add("cards", (ChatCommandAction)&nbm_liar_game::cmd_cards, this);
-		m_command = &lcmd;
+		m_commands = &lcmd;
 	}
 
 	inline LGame *getGame(Channel *c)
@@ -318,6 +319,11 @@ public:
 		return false;
 	}
 
+	CHATCMD_FUNC(cmd_help)
+	{
+		c->say("Available subcommands: " + m_commands->getList());
+	}
+
 	CHATCMD_FUNC(cmd_join)
 	{
 		LGame *g = getGame(c);
@@ -327,7 +333,7 @@ public:
 		}
 
 		if (!g) {
-			g = new LGame(c, m_command);
+			g = new LGame(c, m_commands);
 			c->getContainers()->set(this, g);
 		}
 
@@ -568,7 +574,7 @@ public:
 	}
 
 private:
-	ChatCommand *m_command = nullptr;
+	ChatCommand *m_commands = nullptr;
 };
 
 

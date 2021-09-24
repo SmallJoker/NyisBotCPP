@@ -229,6 +229,11 @@ Settings *ModuleMgr::getSettings(IModule *module) const
 	return new Settings("config/modules.conf", nullptr, mi->name);
 }
 
+Settings *ModuleMgr::getGlobalSettings() const
+{
+	return m_client->getSettings();
+}
+
 void ModuleMgr::onStep(float time)
 {
 	MutexLock _(m_lock);

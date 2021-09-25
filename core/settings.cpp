@@ -45,10 +45,18 @@ Settings::~Settings()
 	delete m_prefix;
 }
 
+Settings *Settings::fork(cstr_t &prefix)
+{
+	return new Settings(m_file, m_parent, prefix);
+}
+
 static std::string unknown_setting = "";
 	
-static bool is_valid_key(cstr_t &str)
+bool Settings::isKeyValid(cstr_t &str)
 {
+	if (str.empty())
+		return false;
+
 	for (char c : str) {
 		if (c >= 'A' && c <= 'Z')
 			continue;
@@ -81,7 +89,7 @@ cstr_t &Settings::get(cstr_t &key) const
 
 bool Settings::set(cstr_t &key, cstr_t &value)
 {
-	if (!is_valid_key(key)) {
+	if (!isKeyValid(key)) {
 		WARN("Invalid key '" << key << "'");
 		return false;
 	}
@@ -198,7 +206,7 @@ bool Settings::syncFileContents()
 			}
 
 			std::string key = strtrim(line.substr(0, pos - 1));
-			if (!is_valid_key(key)) {
+			if (!isKeyValid(key)) {
 				WARN("Invalid key '" << key << " in line " << line_n);
 				break;
 			}

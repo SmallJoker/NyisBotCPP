@@ -376,9 +376,6 @@ public:
 
 	void onClientReady()
 	{
-		if (m_settings)
-			return;
-
 		m_settings = getModuleMgr()->getSettings(this);
 		m_settings->syncFileContents();
 	}

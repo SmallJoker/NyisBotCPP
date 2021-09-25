@@ -32,6 +32,8 @@ public:
 	~Settings();
 	DISABLE_COPY(Settings);
 
+	Settings *fork(cstr_t &prefix);
+
 	cstr_t &get(cstr_t &key) const;
 	bool set(cstr_t &key, cstr_t &value);
 	bool get(cstr_t &key, SettingType *type) const;
@@ -40,6 +42,8 @@ public:
 	bool remove(cstr_t &key);
 
 	bool syncFileContents();
+
+	static bool isKeyValid(cstr_t &key);
 
 private:
 	mutable std::mutex m_lock;

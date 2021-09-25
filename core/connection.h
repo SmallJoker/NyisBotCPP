@@ -16,11 +16,13 @@ public:
 	static Connection *createHTTP_GET(cstr_t &url);
 
 	~Connection();
+	DISABLE_COPY(Connection);
 
 	void connect();
 
 	bool send(cstr_t &data) const;
 	std::string *popRecv();
+	std::string *popAll();
 
 private:
 	Connection(ConnectionType ct);

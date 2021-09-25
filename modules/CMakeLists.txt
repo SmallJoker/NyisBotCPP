@@ -20,6 +20,7 @@ function(my_add_module)
 endfunction()
 
 my_add_module("nbm_builtin")
+#my_add_module("nbm_feeds")
 my_add_module("nbm_liar_game")
 my_add_module("nbm_superior_uno")
 my_add_module("nbm_timebomb")

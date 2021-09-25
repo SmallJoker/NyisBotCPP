@@ -122,6 +122,22 @@ std::string *Connection::popRecv()
 	return data;
 }
 
+std::string *Connection::popAll()
+{
+	MutexLock _(m_recv_queue_lock);
+	if (m_recv_queue.size() == 0)
+		return nullptr;
+
+	std::string *data = new std::string();
+	data->resize(m_recv_queue.front().size() * m_recv_queue.size());
+
+	while (!m_recv_queue.empty()) {
+		data->append(m_recv_queue.front());
+		m_recv_queue.pop();
+	}
+	return data;
+}
+
 size_t Connection::recv(std::string &data)
 {
 	// Re-use memory wherever possible

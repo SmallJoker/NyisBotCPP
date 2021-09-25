@@ -1,0 +1,9 @@
+# This is for the --tui mode
+# ./loader --tui
+# load ../tests/test_feeds.txt
+
+reload feeds
+
+channel add #test
+user add FOO #test
+user say FOO #test $feeds add test https://github.com/torvalds/linux/commits/master.atom

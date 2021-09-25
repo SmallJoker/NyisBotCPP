@@ -11,7 +11,7 @@
 #include <memory> // unique_ptr
 
 struct ClientActionEntry {
-	int offset;
+	size_t offset;
 	const char *status;
 	void (ClientIRC::*handler)(cstr_t &status, NetworkEvent *e);
 };

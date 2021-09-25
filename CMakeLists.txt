@@ -11,13 +11,8 @@ message("--- Setting up NyisBotCPP")
 find_package(CURL REQUIRED)
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads REQUIRED) # pthread
+find_package(pugixml REQUIRED)
 
-if (TRUE)
-	# Find pugixml
-	mark_as_advanced(PUGIXML_INCLUDE_DIR PUGIXML_LIBRARY) 
-	find_path(PUGIXML_INCLUDE_DIR pugixml.hpp)
-	find_library(PUGIXML_LIBRARY NAMES pugixml)
-endif()
 
 # More packages:
 # gason: https://github.com/jyaif/gason
@@ -26,13 +21,13 @@ endif()
 ### Compiler options
 
 if (NOT MSVC)
-	# -O3 is default
-	#set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
-
-	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-undefined")
+	# -O3 is default for release
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 
 	# Debugging symbols
-	#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
+	set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_C_FLAGS} -g -O0")
+
+	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-undefined")
 endif()
 
 
@@ -52,7 +47,7 @@ set(SRC_FILES
 include_directories(
 	"${PROJECT_SOURCE_DIR}/core"
 	${CURL_INCLUDE_DIRS}
-	${PUGIXML_INCLUDE_DIR}
+	pugixml
 )
 
 
@@ -65,7 +60,7 @@ target_link_libraries(
 	PRIVATE ${CURL_LIBRARIES}
 	PRIVATE ${CMAKE_DL_LIBS}
 	PRIVATE Threads::Threads
-	PRIVATE ${PUGIXML_LIBRARY}
+	PUBLIC pugixml
 )
 
 

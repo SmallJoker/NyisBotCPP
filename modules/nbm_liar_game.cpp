@@ -447,7 +447,7 @@ public:
 			std::string index(get_next_part(msg));
 			long out = -1;
 			if (!SettingType::parseLong(index, &out) ||
-					out > p->cards.size() || out < 1) {
+					out > (long)p->cards.size() || out < 1) {
 				c->reply(ui, "Invalid card index \"" + std::to_string(out) +
 					"\". Play one between 1 and " +
 					std::to_string(p->cards.size()) + " from your hand.");

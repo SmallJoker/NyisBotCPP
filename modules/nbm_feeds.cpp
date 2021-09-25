@@ -5,12 +5,15 @@
 #include "module.h"
 #include "settings.h"
 #include "utils.h"
+//#include <fstream>
 #include <iostream>
 #include <memory>
 #include <pugixml.hpp>
 
 
 struct Feeds : public IContainer {
+	std::string dump() const { return "Feeds"; }
+
 	~Feeds()
 	{
 		if (settings)
@@ -63,11 +66,12 @@ public:
 
 			f->settings->syncFileContents();
 		}
+		LOG("Feed check completed");
 	}
 
 	void onChannelLeave(Channel *c)
 	{
-		delete c->getContainers()->get(this);
+		c->getContainers()->remove(this);
 	}
 
 	inline Feeds *getFeedsOrCreate(Channel *c)
@@ -87,6 +91,7 @@ public:
 
 	void notifySingle(Channel *c, cstr_t &key, Feeds *f)
 	{
+#if 1
 		cstr_t &url = f->settings->get(key);
 
 		// Download feed, analyze
@@ -95,19 +100,56 @@ public:
 
 		std::unique_ptr<std::string> text(con->popAll());
 		if (!text) {
-			WARN("Download failed");
+			WARN("Download failed. Removing " + url);
+			f->settings->remove(key);
 			return;
 		}
 
 		pugi::xml_document doc;
-		pugi::xml_parse_result result = doc.load_string(text->c_str());
+		pugi::xml_parse_result result = doc.load_buffer_inplace(&(*text)[0], text->size());
+#else
+		pugi::xml_document doc;
+		std::ifstream file("example_feed.txt");
+		pugi::xml_parse_result result = doc.load(file);
+#endif
+
 		if (!result)
 			WARN("XML parser fail: " << result.description());
 
-		auto nodes = doc.select_nodes("/feed/entry");
-		for (auto &it : nodes) {
-			std::cout << it.node().child("title").text() << std::endl;
+		time_t last_update = time(nullptr);
+		{
+			auto it = f->last_update.find(key);
+			if (it != f->last_update.end())
+				last_update = it->second;
 		}
+
+		auto nodes = doc.select_nodes("/feed/entry");
+		int msg_limit = 3;
+		for (auto &it : nodes) {
+			std::string title(strtrim(it.node().child_value("title")));
+			auto link = it.node().child("link").attribute("href").as_string();
+			auto author = it.node().child("author").child_value("name");
+			auto date = it.node().child_value("updated");
+
+			tm timeinfo;
+			if (!strptime(date, "%FT%TZ", &timeinfo))
+				continue; // Invalid date
+
+			time_t unix_time = mktime(&timeinfo);
+			if (unix_time <= last_update)
+				continue; // Skip old information
+
+			if (msg_limit-- == 0)
+				break; // Rate limit
+
+			auto parts = strsplit(link, '/');
+			std::string out;
+			out.append(colorize_string(author, IC_GREEN));
+			out.append(" @").append(colorize_string(parts[3], IC_MAROON)); // @projectname
+			out.append(": ").append(colorize_string(title, IC_LIGHT_GRAY)); // : title
+			c->say(out);
+		}
+		f->last_update[key] = time(nullptr);
 	}
 
 	CHATCMD_FUNC(cmd_help)
@@ -120,7 +162,13 @@ public:
 		Feeds *f = getFeedsOrCreate(c);
 		if (!f)
 			return;
-		// stub
+
+		std::string out("List of feeds: ");
+		auto keys = f->settings->getKeys();
+		for (cstr_t &key : keys)
+			out.append(key + " ");
+
+		c->say(out);
 	}
 
 	CHATCMD_FUNC(cmd_add)
@@ -129,10 +177,21 @@ public:
 		if (!f)
 			return;
 
-		std::string key = "test";
+		std::string key(get_next_part(msg));
+		if (!Settings::isKeyValid(key)) {
+			c->reply(ui, "Key contains invalid characters. Allowed are: [A-z0-9_.]");
+			return;
+		}
+		if (msg.empty()) {
+			c->reply(ui, "URL is required. $feeds add <name> <URL>");
+			return;
+		}
+
 		f->settings->set(key, strtrim(msg));
 
+		// Test it.
 		notifySingle(c, key, f);
+		c->say(ui->nickname + ": Added!");
 	}
 
 	CHATCMD_FUNC(cmd_remove)

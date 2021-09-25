@@ -14,13 +14,11 @@ endif()
 
 function(my_add_module)
 	add_library(${ARGV0} SHARED "${ARGV0}.cpp")
-	target_link_libraries(${ARGV0}
-		PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/../libNyisBotCPP.so"
-	)
+	target_link_libraries(${ARGV0} PRIVATE NyisBotCPP)
 endfunction()
 
 my_add_module("nbm_builtin")
-#my_add_module("nbm_feeds")
+my_add_module("nbm_feeds")
 my_add_module("nbm_liar_game")
 my_add_module("nbm_superior_uno")
 my_add_module("nbm_timebomb")

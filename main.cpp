@@ -6,7 +6,6 @@
 #include "module.h"
 #include "settings.h"
 #include "tests/test.h"
-#include "pugixml.hpp"
 
 static IClient *s_cli = nullptr;
 static Settings *settings_ro = nullptr;
@@ -49,13 +48,6 @@ DLL_EXPORT int main(int argc, char *argv[])
 
 	g_logger->setupFile(logfile.c_str());
 	g_logger->setLogLevels(verbose ? LL_VERBOSE : LL_NORMAL, LL_NORMAL);
-
-	{
-		// Short pugixml test
-		pugi::xml_document doc;
-		pugi::xml_parse_result result = doc.load_string("<html></html>");
-		LOG(result.description());
-	}
 
 	LOG("Startup");
 

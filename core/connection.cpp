@@ -129,7 +129,7 @@ std::string *Connection::popAll()
 		return nullptr;
 
 	std::string *data = new std::string();
-	data->resize(m_recv_queue.front().size() * m_recv_queue.size());
+	data->reserve(m_recv_queue.front().size() * m_recv_queue.size());
 
 	while (!m_recv_queue.empty()) {
 		data->append(m_recv_queue.front());

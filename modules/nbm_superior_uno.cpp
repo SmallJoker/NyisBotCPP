@@ -106,7 +106,7 @@ public:
 		return drawn;
 	}
 
-	void win(std::set<UnoPlayer *> &players, int initial_player_count)
+	void win(std::set<UnoPlayer *> &players, size_t initial_player_count)
 	{
 		int elo_losers = 0;
 		for (UnoPlayer *p : players) {
@@ -340,7 +340,7 @@ private:
 	Settings *m_settings;
 	std::set<UserInstance *> m_players;
 
-	int m_initial_player_count;
+	size_t m_initial_player_count;
 };
 
 struct WaitingForAuth {
@@ -757,7 +757,7 @@ public:
 		});
 
 		std::ostringstream ss;
-		for (int n = 0; n < 5 && n < top.size(); n++) {
+		for (size_t n = 0; n < 5 && n < top.size(); n++) {
 			if (n > 0)
 				ss << ", ";
 			ss << *top[n].name << " (" << top[n].score << ")";

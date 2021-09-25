@@ -47,7 +47,7 @@ Settings::~Settings()
 
 Settings *Settings::fork(cstr_t &prefix)
 {
-	return new Settings(m_file, m_parent, prefix);
+	return new Settings(m_file, m_parent, m_prefix ? *m_prefix + prefix : prefix);
 }
 
 static std::string unknown_setting = "";

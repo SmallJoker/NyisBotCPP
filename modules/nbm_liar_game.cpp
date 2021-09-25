@@ -237,7 +237,7 @@ public:
 		ss << ". Current player: " << ui->nickname;
 
 		c->say(ss.str());
-		c->reply(ui, LPlayer::format(g->getPlayer(ui)->cards, true));
+		c->notice(ui, LPlayer::format(g->getPlayer(ui)->cards, true));
 	}
 
 	// Returns true if the player finished
@@ -358,7 +358,7 @@ public:
 		LGame *g = getGame(c);
 		LPlayer *p = g ? g->getPlayer(ui) : nullptr;
 		if (!p || !g->has_started) {
-			c->reply(ui, "There is no game for you to leave");
+			c->notice(ui, "There is no game for you to leave");
 			return;
 		}
 
@@ -370,7 +370,7 @@ public:
 		LGame *g = getGame(c);
 		LPlayer *p = g ? g->getPlayer(ui) : nullptr;
 		if (!p || g->has_started) {
-			c->reply(ui, "There is no game for you to start");
+			c->notice(ui, "There is no game for you to start");
 			return;
 		}
 
@@ -388,7 +388,7 @@ public:
 		for (UserInstance *ui : g->getAllPlayers())
 			updateCardsWin(c, ui, false);
 
-		c->reply(ui, LPlayer::format(g->getPlayer(ui)->cards, true));
+		c->notice(ui, LPlayer::format(g->getPlayer(ui)->cards, true));
 	}
 
 	CHATCMD_FUNC(cmd_add)
@@ -396,12 +396,12 @@ public:
 		LGame *g = getGame(c);
 		LPlayer *p = g ? g->getPlayer(ui) : nullptr;
 		if (!p || !g->has_started) {
-			c->reply(ui, "You are not part of an ongoing game");
+			c->notice(ui, "You are not part of an ongoing game");
 			return;
 		}
 
 		if (ui != g->current) {
-			c->reply(ui, "It is yet not your turn. Current: " + g->current->nickname);
+			c->notice(ui, "It is yet not your turn. Current: " + g->current->nickname);
 			return;
 		}
 
@@ -426,7 +426,7 @@ public:
 					ret.append(" ");
 				}
 			}
-			c->reply(ui, ret);
+			c->notice(ui, ret);
 			return;
 		}
 
@@ -435,7 +435,7 @@ public:
 		} else {
 			// Validate
 			if (face_c != g->main_face) {
-				c->reply(ui, "Wrong card type! Please pretend to place a card of type " +
+				c->notice(ui, "Wrong card type! Please pretend to place a card of type " +
 					LPlayer::format({ g->main_face }));
 				return;
 			}
@@ -448,7 +448,7 @@ public:
 			long out = -1;
 			if (!SettingType::parseLong(index, &out) ||
 					out > (long)p->cards.size() || out < 1) {
-				c->reply(ui, "Invalid card index \"" + std::to_string(out) +
+				c->notice(ui, "Invalid card index \"" + std::to_string(out) +
 					"\". Play one between 1 and " +
 					std::to_string(p->cards.size()) + " from your hand.");
 				return;
@@ -456,7 +456,7 @@ public:
 			indices.insert(out - 1);
 		}
 		if (indices.empty()) {
-			c->reply(ui, "Please specify at least one card index.");
+			c->notice(ui, "Please specify at least one card index.");
 			return;
 		}
 
@@ -486,17 +486,17 @@ public:
 		LGame *g = getGame(c);
 		LPlayer *p = g ? g->getPlayer(ui) : nullptr;
 		if (!p || !g->has_started) {
-			c->reply(ui, "You are not part of an ongoing game");
+			c->notice(ui, "You are not part of an ongoing game");
 			return;
 		}
 
 		if (ui != g->current) {
-			c->reply(ui, "It is yet not your turn. Current: " + g->current->nickname);
+			c->notice(ui, "It is yet not your turn. Current: " + g->current->nickname);
 			return;
 		}
 
 		if (g->stack.empty()) {
-			c->reply(ui, "There is no stack to check. Please start a new one.");
+			c->notice(ui, "There is no stack to check. Please start a new one.");
 			return;
 		}
 
@@ -543,13 +543,13 @@ public:
 			// User played their last card and it was correct
 			g->removePlayer(ui_prev);
 		} else {
-			c->reply(ui_prev, LPlayer::format(p_prev->cards, true));
+			c->notice(ui_prev, LPlayer::format(p_prev->cards, true));
 		}
 		if (updateCardsWin(c, ui, false)) {
 			// Obscure win: discard all 4 in the hand
 			g->removePlayer(ui);
 		} else {
-			c->reply(ui, LPlayer::format(p->cards, true));
+			c->notice(ui, LPlayer::format(p->cards, true));
 		}
 
 		if (!processGameUpdate(c))
@@ -565,12 +565,12 @@ public:
 		LGame *g = getGame(c);
 		LPlayer *p = g ? g->getPlayer(ui) : nullptr;
 		if (!p || !g->has_started) {
-			c->reply(ui, "You are not part of an ongoing game");
+			c->notice(ui, "You are not part of an ongoing game");
 			return;
 		}
 
 		p->shuffle(p->cards);
-		c->reply(ui, LPlayer::format(p->cards, true));
+		c->notice(ui, LPlayer::format(p->cards, true));
 	}
 
 private:

@@ -52,9 +52,9 @@ public:
 	void onStep(float time)
 	{
 		timer += time;
-		if (timer < 15 * 60)
+		if (timer < 30 * 60)
 			return;
-		timer -= 15 * 60;
+		timer -= 30 * 60;
 
 		for (Channel *c : getNetwork()->getAllChannels()) {
 			Feeds *f = getFeedsOrCreate(c);

@@ -200,7 +200,7 @@ bool Settings::syncFileContents()
 				break;
 
 			size_t pos = line.find_first_of('=');
-			if (pos == std::string::npos || pos == 0 || pos + 1 == line.size()) {
+			if (pos == std::string::npos || pos == 0) {
 				WARN("Syntax error in line " << line_n << ": " << line);
 				break;
 			}

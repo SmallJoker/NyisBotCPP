@@ -1,5 +1,6 @@
 #include "args_parser.h"
 #include "logger.h"
+#include "client/client_discord.h"
 #include "client/client_irc.h"
 #include "client/client_tui.h"
 #include "connection.h"
@@ -31,7 +32,6 @@ DLL_EXPORT int main(int argc, char *argv[])
 	bool run_unittest = false;
 	bool no_modules = false;
 	bool no_random = false;
-	bool use_tui = false;
 	bool verbose = false;
 	std::string logfile("debug.txt");
 	std::string config_type("user");
@@ -42,7 +42,6 @@ DLL_EXPORT int main(int argc, char *argv[])
 	CLIArg("logfile",    &logfile);
 	CLIArg("quicktest",  &run_client);
 	CLIArg("unittest",   &run_unittest);
-	CLIArg("tui",        &use_tui);
 	CLIArg("verbose",    &verbose);
 	CLIArg::parseArgs(argc, argv);
 
@@ -68,10 +67,15 @@ DLL_EXPORT int main(int argc, char *argv[])
 	if (!no_random)
 		std::srand(std::time(nullptr));
 
-	if (use_tui)
-		s_cli = new ClientTUI(settings_rw);
-	else
+	cstr_t &client_type = settings_rw->get("client.type");
+	if (client_type == "irc")
 		s_cli = new ClientIRC(settings_rw);
+	else if (client_type == "tui")
+		s_cli = new ClientTUI(settings_rw);
+	else if (client_type == "discord")
+		s_cli = new ClientDiscord(settings_rw);
+
+	ASSERT(s_cli, "client.type setting value is not supported.");
 
 	if (!no_modules) {
 		if (!s_cli->getModuleMgr()->loadModules())

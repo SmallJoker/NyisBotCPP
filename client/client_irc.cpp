@@ -50,12 +50,12 @@ ClientIRC::~ClientIRC()
 
 void ClientIRC::initialize()
 {
-	m_nickname = m_settings->get("client.nickname");
-	SettingTypeLong at; m_settings->get("client.authtype", &at);
+	m_nickname = m_settings->get("irc.nickname");
+	SettingTypeLong at; m_settings->get("irc.authtype", &at);
 	m_auth_type = at.value;
 
-	const std::string &addr = m_settings->get("client.address");
-	SettingTypeLong port;     m_settings->get("client.port", &port);
+	const std::string &addr = m_settings->get("irc.address");
+	SettingTypeLong port;     m_settings->get("irc.port", &port);
 
 	m_con = Connection::createStream(addr, port.value);
 	m_con->connect();
@@ -256,7 +256,7 @@ void ClientIRC::handleClientEvent(cstr_t &status, NetworkEvent *e)
 			// Our mode updated. Auth, if not already done.
 			if (m_auth_status == AS_AUTHENTICATE) {
 				if (m_auth_type > 0)
-					sendRaw("PRIVMSG NickServ :identify " + m_settings->get("client.password"));
+					sendRaw("PRIVMSG NickServ :identify " + m_settings->get("irc.password"));
 			}
 
 			if (strchr(m_user_modes, 'r'))
@@ -403,7 +403,7 @@ void ClientIRC::handleAuthentication(cstr_t &status, NetworkEvent *e)
 		sendRaw("USER " + m_nickname + " foo bar :Generic description");
 		sendRaw("NICK " + m_nickname);
 
-		SettingTypeLong at; m_settings->get("client.authtype", &at);
+		SettingTypeLong at; m_settings->get("irc.authtype", &at);
 		if (at.value > 0)
 			m_auth_status = AS_AUTHENTICATE;
 
@@ -443,7 +443,7 @@ void ClientIRC::joinChannels()
 		return;
 	m_auth_status = AS_DONE;
 
-	auto channels = strsplit(m_settings->get("client.channels"));
+	auto channels = strsplit(m_settings->get("irc.channels"));
 	for (const std::string &chan : channels) {
 		if (chan.size() < 2 || chan[0] != '#')
 			continue;

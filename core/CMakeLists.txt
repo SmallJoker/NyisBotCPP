@@ -4,8 +4,6 @@ set(CORE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/channel.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/chatcommand.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/client.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/client_irc.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/client_tui.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/connection.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/container.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/logger.cpp

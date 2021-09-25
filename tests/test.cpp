@@ -16,6 +16,8 @@ Unittest::Unittest()
 	// Channel depends on Containers (Module)
 	void test_Channel(Unittest *t);
 	test_Channel(this);
+	void test_Connection(Unittest *t);
+	test_Connection(this);
 }
 
 

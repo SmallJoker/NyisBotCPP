@@ -57,7 +57,8 @@ void ClientIRC::initialize()
 	const std::string &addr = m_settings->get("client.address");
 	SettingTypeLong port;     m_settings->get("client.port", &port);
 
-	m_con = new Connection(addr, port.value);
+	m_con = Connection::createStream(addr, port.value);
+	m_con->connect();
 	sendRaw("PING server");
 }
 

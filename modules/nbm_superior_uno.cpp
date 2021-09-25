@@ -524,7 +524,7 @@ public:
 					.timeout = 0,
 					.msg = msg
 				});
-				ui->set(&ui->account, nullptr); // Auth request pending
+				ui->set(&ui->account, new IContainer()); // Auth request pending
 				onUserLeave(c, ui);
 				return;
 			} else {

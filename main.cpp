@@ -1,10 +1,10 @@
-#include "core/args_parser.h"
-#include "core/logger.h"
-#include "core/client_irc.h" // subject to change
-#include "core/client_tui.h" // subject to change
-#include "core/connection.h"
-#include "core/module.h"
-#include "core/settings.h"
+#include "args_parser.h"
+#include "logger.h"
+#include "client/client_irc.h"
+#include "client/client_tui.h"
+#include "connection.h"
+#include "module.h"
+#include "settings.h"
 #include "tests/test.h"
 
 static IClient *s_cli = nullptr;
@@ -56,17 +56,6 @@ DLL_EXPORT int main(int argc, char *argv[])
 		if (!test.runTests())
 			exit(EXIT_FAILURE);
 		exit(EXIT_SUCCESS);
-	}
-
-	if (0) {
-		Connection con("http://example.com", 80);
-
-		// Demo
-		std::string what("GET / HTTP/1.0\r\nHost: example.com\r\n\r\n");
-		con.send(what);
-
-		//WAIT_MS(1000);
-		getchar();
 	}
 
 	settings_ro = new Settings("config/main.defaults.conf", nullptr);

@@ -9,6 +9,10 @@ find_package(CURL REQUIRED)
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads REQUIRED) # pthread
 
+# More packages:
+# pugixml: https://pugixml.org/docs/quickstart.html
+# gason: https://github.com/jyaif/gason
+
 if (NOT MSVC)
 	# -O3 is default
 	#set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
@@ -19,11 +23,13 @@ if (NOT MSVC)
 	#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
 endif()
 
+add_subdirectory("${PROJECT_SOURCE_DIR}/client")
 add_subdirectory("${PROJECT_SOURCE_DIR}/core")
 add_subdirectory("${PROJECT_SOURCE_DIR}/tests")
 
 # Source files
 set(SRC_FILES
+	${CLIENT_FILES}
 	${CORE_FILES}
 	${TESTS_FILES}
 	main.cpp
@@ -31,7 +37,7 @@ set(SRC_FILES
 
 # Include Directories
 include_directories(
-	${PROJECT_SOURCE_DIR}
+	"${PROJECT_SOURCE_DIR}/core"
 	${CURL_INCLUDE_DIRS}
 )
 

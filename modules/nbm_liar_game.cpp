@@ -164,7 +164,7 @@ public:
 		return true;
 	}
 
-	static const size_t MIN_PLAYERS = 1;
+	static const size_t MIN_PLAYERS = 3;
 
 	bool has_started = false;
 	UserInstance *current = nullptr;

@@ -61,8 +61,11 @@ public:
 
 			// Iterate through all registered feeds
 			auto keys = f->settings->getKeys();
-			for (cstr_t &key : keys)
-				notifySingle(c, key, f);
+			for (cstr_t &key : keys) {
+				const char *err = notifySingle(c, key, f);
+				if (err)
+					WARN(err);
+			}
 
 			f->settings->syncFileContents();
 		}
@@ -84,12 +87,23 @@ public:
 			f = new Feeds();
 			// Assign required settings prefix -> trim '#' in front
 			f->settings = m_settings->fork(c->getName().substr(1));
+			f->settings->syncFileContents(); // read
 			c->getContainers()->set(this, f);
 		}
 		return f;
 	}
 
-	void notifySingle(Channel *c, cstr_t &key, Feeds *f)
+	bool isBotAdmin(Channel *c, UserInstance *ui)
+	{
+		cstr_t &admin = getModuleMgr()->getGlobalSettings()->get("client.admin");
+		if (ui->nickname == admin && ui->account == UserInstance::UAS_LOGGED_IN)
+			return true;
+
+		c->reply(ui, "Insufficient privileges.");
+		return false;
+	}
+
+	const char *notifySingle(Channel *c, cstr_t &key, Feeds *f)
 	{
 #if 1
 		cstr_t &url = f->settings->get(key);
@@ -100,9 +114,8 @@ public:
 
 		std::unique_ptr<std::string> text(con->popAll());
 		if (!text) {
-			WARN("Download failed. Removing " + url);
 			f->settings->remove(key);
-			return;
+			return "File download failed";
 		}
 
 		pugi::xml_document doc;
@@ -113,8 +126,10 @@ public:
 		pugi::xml_parse_result result = doc.load(file);
 #endif
 
-		if (!result)
-			WARN("XML parser fail: " << result.description());
+		if (!result) {
+			WARN("XML parser failed: " << result.description());
+			return "XML parser failed";
+		}
 
 		time_t last_update = time(nullptr);
 		{
@@ -124,6 +139,9 @@ public:
 		}
 
 		auto nodes = doc.select_nodes("/feed/entry");
+		if (nodes.empty())
+			return "Cannot find any feed entries";
+
 		int msg_limit = 3;
 		for (auto &it : nodes) {
 			std::string title(strtrim(it.node().child_value("title")));
@@ -150,6 +168,8 @@ public:
 			c->say(out);
 		}
 		f->last_update[key] = time(nullptr);
+
+		return nullptr;
 	}
 
 	CHATCMD_FUNC(cmd_help)
@@ -173,6 +193,8 @@ public:
 
 	CHATCMD_FUNC(cmd_add)
 	{
+		if (!isBotAdmin(c, ui))
+			return;
 		Feeds *f = getFeedsOrCreate(c);
 		if (!f)
 			return;
@@ -190,12 +212,19 @@ public:
 		f->settings->set(key, strtrim(msg));
 
 		// Test it.
-		notifySingle(c, key, f);
+		const char *err = notifySingle(c, key, f);
+		if (err) {
+			c->say("Feed test failed: " + std::string(err));
+			f->settings->remove(key);
+			return;
+		}
 		c->say(ui->nickname + ": Added!");
 	}
 
 	CHATCMD_FUNC(cmd_remove)
 	{
+		if (!isBotAdmin(c, ui))
+			return;
 		Feeds *f = getFeedsOrCreate(c);
 		if (!f)
 			return;

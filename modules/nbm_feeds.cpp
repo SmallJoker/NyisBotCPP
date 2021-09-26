@@ -109,7 +109,7 @@ public:
 		cstr_t &url = f->settings->get(key);
 
 		// Download feed, analyze
-		std::unique_ptr<Connection> con(Connection::createHTTP_GET(url));
+		std::unique_ptr<Connection> con(Connection::createHTTP("GET", url));
 		con->connect();
 
 		std::unique_ptr<std::string> text(con->popAll());

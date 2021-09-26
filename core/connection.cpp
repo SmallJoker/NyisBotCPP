@@ -6,6 +6,18 @@
 #include <sstream>
 #include <string.h>
 
+// Init on program start, destruct on close
+struct curl_init {
+	curl_init()
+	{
+		curl_global_init(CURL_GLOBAL_ALL);
+	}
+	~curl_init()
+	{
+		curl_global_cleanup();
+	}
+} CURL_INIT;
+
 Connection *Connection::createStream(cstr_t &address, int port)
 {
 	Connection *con = new Connection(CT_STREAM);
@@ -20,17 +32,30 @@ Connection *Connection::createStream(cstr_t &address, int port)
 	return con;
 }
 
-Connection *Connection::createHTTP_GET(cstr_t &url)
+Connection *Connection::createHTTP(cstr_t &method, cstr_t &url)
 {
-	Connection *con = new Connection(CT_HTTP_GET);
+	Connection *con = new Connection(CT_HTTP);
 	curl_easy_setopt(con->m_curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2_0);
-	curl_easy_setopt(con->m_curl, CURLOPT_USERAGENT, "curl/" LIBCURL_VERSION);
-	curl_easy_setopt(con->m_curl, CURLOPT_HTTPGET, 1L);
 	curl_easy_setopt(con->m_curl, CURLOPT_URL, url.c_str());
+
+	if (method == "GET")
+		curl_easy_setopt(con->m_curl, CURLOPT_HTTPGET, 1L);
+	else if (method == "POST")
+		curl_easy_setopt(con->m_curl, CURLOPT_POST, 1L);
+	else if (method == "PUT") {
+		curl_easy_setopt(con->m_curl, CURLOPT_CUSTOMREQUEST, method.c_str());
+		curl_easy_setopt(con->m_curl, CURLOPT_UPLOAD, 1L);
+	} else
+		curl_easy_setopt(con->m_curl, CURLOPT_CUSTOMREQUEST, method.c_str());
+
+	curl_easy_setopt(con->m_curl, CURLOPT_NOBODY, 0L);
+	curl_easy_setopt(con->m_curl, CURLOPT_USERAGENT, "curl/" LIBCURL_VERSION);
 	curl_easy_setopt(con->m_curl, CURLOPT_FOLLOWLOCATION, 1L);
-	curl_easy_setopt(con->m_curl, CURLOPT_WRITEFUNCTION, recvAsyncHTTP_GET);
-	curl_easy_setopt(con->m_curl, CURLOPT_WRITEDATA, con);
 	curl_easy_setopt(con->m_curl, CURLOPT_PIPEWAIT, 1L);
+
+	curl_easy_setopt(con->m_curl, CURLOPT_WRITEFUNCTION, recvAsyncHTTP);
+	curl_easy_setopt(con->m_curl, CURLOPT_WRITEDATA, con);
+	//curl_easy_setopt(con->m_curl, CURLOPT_VERBOSE, 1L);
 	return con;
 }
 
@@ -38,8 +63,6 @@ Connection::Connection(ConnectionType ct) :
 	m_type(ct)
 {
 	// Open connection
-	curl_global_init(CURL_GLOBAL_ALL);
-
 	m_curl = curl_easy_init();
 	ASSERT(m_curl, "CURL init failed");
 }
@@ -53,33 +76,71 @@ Connection::~Connection()
 		m_thread = 0;
 	}
 
+	if (m_http_headers)
+		curl_slist_free_all(m_http_headers);
+
 	// Disconnect
 	curl_easy_cleanup(m_curl);
-	curl_global_cleanup();
+}
+
+void Connection::setHTTP_URL(cstr_t &url)
+{
+	if (m_type != CT_HTTP)
+		return;
+
+	curl_easy_setopt(m_curl, CURLOPT_URL, url.c_str());
+}
+
+void Connection::addHTTP_Header(cstr_t &what)
+{
+	if (m_is_alive)
+		return;
+
+	m_http_headers = curl_slist_append(m_http_headers, what.c_str());
+}
+
+void Connection::setHTTP_Data(std::string && data)
+{
+	m_http_data = std::move(data);
+	m_http_data_index = 0;
+
+	curl_easy_setopt(m_curl, CURLOPT_READFUNCTION, &sendAsyncHTTP);
+	curl_easy_setopt(m_curl, CURLOPT_READDATA, this);
+	/*
+	curl_easy_setopt(m_curl, CURLOPT_POSTFIELDSIZE, data.size());
+	curl_easy_setopt(m_curl, CURLOPT_POSTFIELDS, data.c_str()); // not copied!
+	*/
 }
 
 void Connection::connect()
 {
-	CURLcode res;
-	res = curl_easy_perform(m_curl);
+	curl_easy_setopt(m_curl, CURLOPT_HTTPHEADER, m_http_headers);
+	CURLcode res = curl_easy_perform(m_curl);
 
 	ASSERT(res == CURLE_OK, "curl failed: " << curl_easy_strerror(res));
 
-	m_is_alive = true;
-	int status = 0;
-	if (m_type == CT_STREAM)
-		status = pthread_create(&m_thread, nullptr, &recvAsyncStream, this);
+	if (m_type == CT_STREAM) {
+		m_is_alive = true;
+		int status = pthread_create(&m_thread, nullptr, &recvAsyncStream, this);
 
-	if (status != 0) {
-		m_is_alive = false;
-		ERROR("pthread failed: " << strerror(status));
+		if (status != 0) {
+			m_is_alive = false;
+			ERROR("pthread failed: " << strerror(status));
+		}
 	}
+	// For HTTP, the request is already done now.
+
 	// https://gcc.gnu.org/bugzilla/show_bug.cgi?id=67791
 	//m_thread = new std::thread(recvAsync, this);
 }
 
 bool Connection::send(cstr_t &data) const
 {
+	if (!m_is_alive) {
+		WARN("Connection is dead.");
+		return false;
+	}
+
 	if (data.size() < 255)
 		VERBOSE("<< Sending: " << strtrim(data));
 	else
@@ -213,7 +274,7 @@ void *Connection::recvAsyncStream(void *con_p)
 	return nullptr;
 }
 
-size_t Connection::recvAsyncHTTP_GET(void *contents, size_t size, size_t nmemb, void *con_p)
+size_t Connection::recvAsyncHTTP(void *contents, size_t size, size_t nmemb, void *con_p)
 {
 	Connection *con = (Connection *)con_p;
 
@@ -224,4 +285,16 @@ size_t Connection::recvAsyncHTTP_GET(void *contents, size_t size, size_t nmemb, 
 	memcpy(&pkt[0], contents, pkt.size());
 
 	return pkt.size();
+}
+
+size_t Connection::sendAsyncHTTP(void *contents, size_t size, size_t nmemb, void *con_p)
+{
+	Connection *con = (Connection *)con_p;
+
+	size_t to_send = std::min(nmemb * size, con->m_http_data.size() - con->m_http_data_index);
+	memcpy(contents, &con->m_http_data[con->m_http_data_index], to_send);
+
+	LOG("Write " << to_send << " bytes");
+	con->m_http_data_index += to_send;
+	return to_send;
 }

@@ -3,17 +3,16 @@
 #include "client.h"
 #include "types.h"
 
-class ChatCommand;
 class IModule;
 class Settings;
 
 class ClientDiscord : public IClient {
 public:
 	ClientDiscord(Settings *settings);
-	~ClientDiscord() {}
+	~ClientDiscord();
 
-	void initialize() {}
-	bool run() { return false; }
+	void initialize();
+	bool run();
 
 	void sendRaw(cstr_t &text) const {}
 	void actionSay(Channel *c, cstr_t &text) {}
@@ -24,7 +23,11 @@ public:
 
 protected:
 	void processRequest(ClientRequest &cr) {}
+	// Creates a new HTTP request
+	// post_json: picojson::object (manager by caller)
+	// return:    picojson::value  (managed by caller)
+	void *requestREST(cstr_t &method, cstr_t &url, void *post_json = nullptr);
 
 private:
-	ChatCommand *m_commands = nullptr;
+	std::string m_token;
 };

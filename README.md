@@ -26,6 +26,7 @@ Requirements: (using Debian package names)
  * Networking: `libcurl4-*-dev` (one of them)
  * Threading: `libpthread-stubs0-dev` (maybe)
  * XML parsing: `libpugixml-dev`
+ * JSON: [PicoJSON](https://github.com/kazuho/picojson/blob/master/picojson.h)
 
 Steps:
 

@@ -24,7 +24,7 @@ void test_Connection_Stream()
 
 void test_Connection_HTTP_GET()
 {
-	Connection *con = Connection::createHTTP_GET("https://example.com");
+	Connection *con = Connection::createHTTP("GET", "https://example.com");
 	con->connect();
 
 	std::string *first = nullptr;

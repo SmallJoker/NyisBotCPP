@@ -7,17 +7,22 @@
 enum ConnectionType {
 	CT_INVALID,
 	CT_STREAM,
-	CT_HTTP_GET
+	CT_HTTP
 };
+
+struct curl_slist;
 
 class Connection {
 public:
 	static Connection *createStream(cstr_t &address, int port);
-	static Connection *createHTTP_GET(cstr_t &url);
+	static Connection *createHTTP(cstr_t &method, cstr_t &url);
 
 	~Connection();
 	DISABLE_COPY(Connection);
 
+	void setHTTP_URL(cstr_t &url);
+	void addHTTP_Header(cstr_t &what);
+	void setHTTP_Data(std::string && data);
 	void connect();
 
 	bool send(cstr_t &data) const;
@@ -33,11 +38,14 @@ private:
 
 	size_t recv(std::string &data);
 	static void *recvAsyncStream(void *con);
-	static size_t recvAsyncHTTP_GET(void *contents, size_t size, size_t nmemb, void *con_p);
+	static size_t recvAsyncHTTP(void *contents, size_t size, size_t nmemb, void *con_p);
+	static size_t sendAsyncHTTP(void *contents, size_t size, size_t nmemb, void *con_p);
 
 	const ConnectionType m_type;
 	void *m_curl;
-	//void *m_multi = nullptr;
+	curl_slist *m_http_headers = nullptr;
+	std::string m_http_data;
+	size_t m_http_data_index = 0;
 	bool m_is_alive = false;
 
 	// Receive thread

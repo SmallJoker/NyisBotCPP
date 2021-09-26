@@ -13,6 +13,7 @@ set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads REQUIRED) # pthread
 find_package(pugixml REQUIRED)
 
+find_path(PICOJSON_INCLUDE_DIR picojson.h)
 
 # More packages:
 # gason: https://github.com/jyaif/gason
@@ -47,6 +48,7 @@ set(SRC_FILES
 include_directories(
 	"${PROJECT_SOURCE_DIR}/core"
 	${CURL_INCLUDE_DIRS}
+	${PICOJSON_INCLUDE_DIR}
 	pugixml
 )
 

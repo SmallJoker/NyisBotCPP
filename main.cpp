@@ -26,6 +26,7 @@ extern "C" {
 
 DLL_EXPORT int main(int argc, char *argv[])
 {
+	atexit(exit_main);
 	g_logger = new Logger();
 
 	bool run_client = true;
@@ -60,9 +61,9 @@ DLL_EXPORT int main(int argc, char *argv[])
 	settings_ro = new Settings("config/main.defaults.conf", nullptr);
 	settings_rw = new Settings("config/main." + config_type + ".conf", settings_ro);
 	settings_ro->syncFileContents();
-	settings_rw->syncFileContents();
+	if (!settings_rw->syncFileContents())
+		exit(EXIT_FAILURE);
 
-	atexit(exit_main);
 
 	if (!no_random)
 		std::srand(std::time(nullptr));

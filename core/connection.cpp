@@ -3,6 +3,7 @@
 #include "utils.h" // strtrim
 #include <curl/curl.h>
 #include <pthread.h>
+#include <iostream>
 #include <sstream>
 #include <string.h>
 
@@ -55,7 +56,32 @@ Connection *Connection::createHTTP(cstr_t &method, cstr_t &url)
 
 	curl_easy_setopt(con->m_curl, CURLOPT_WRITEFUNCTION, recvAsyncHTTP);
 	curl_easy_setopt(con->m_curl, CURLOPT_WRITEDATA, con);
+	curl_easy_setopt(con->m_curl, CURLOPT_READFUNCTION, sendAsyncHTTP);
+	curl_easy_setopt(con->m_curl, CURLOPT_READDATA, con);
 	//curl_easy_setopt(con->m_curl, CURLOPT_VERBOSE, 1L);
+	return con;
+}
+
+Connection *Connection::createWebsocket(cstr_t &url)
+{
+	Connection *con = new Connection(CT_WEBSOCKET);
+	curl_easy_setopt(con->m_curl, CURLOPT_URL, url.c_str());
+	curl_easy_setopt(con->m_curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+    curl_easy_setopt(con->m_curl, CURLOPT_HEADERFUNCTION, recvAsyncWebsocketHeader);
+    curl_easy_setopt(con->m_curl, CURLOPT_HEADERDATA, con);
+    curl_easy_setopt(con->m_curl, CURLOPT_WRITEFUNCTION, recvAsyncHTTP);
+    curl_easy_setopt(con->m_curl, CURLOPT_WRITEDATA, con);
+	curl_easy_setopt(con->m_curl, CURLOPT_READFUNCTION, sendAsyncHTTP);
+	curl_easy_setopt(con->m_curl, CURLOPT_READDATA, con);
+
+    con->addHTTP_Header("Connection: Upgrade");
+	con->addHTTP_Header("Upgrade: websocket");
+	con->addHTTP_Header("Origin: " + url);
+    con->addHTTP_Header("Sec-WebSocket-Key: SGVsbG8sIHdvcmxkIQ==");
+    con->addHTTP_Header("Sec-WebSocket-Version: 13");
+
+	curl_easy_setopt(con->m_curl, CURLOPT_VERBOSE, 1L);
 	return con;
 }
 
@@ -93,19 +119,20 @@ void Connection::setHTTP_URL(cstr_t &url)
 
 void Connection::addHTTP_Header(cstr_t &what)
 {
-	if (m_is_alive)
+	if (m_type != CT_HTTP && m_type != CT_WEBSOCKET)
 		return;
 
 	m_http_headers = curl_slist_append(m_http_headers, what.c_str());
 }
 
-void Connection::setHTTP_Data(std::string && data)
+void Connection::enqueueHTTP_Send(std::string && data)
 {
-	m_http_data = std::move(data);
-	m_http_data_index = 0;
+	if (m_type != CT_HTTP)
+		return;
 
-	curl_easy_setopt(m_curl, CURLOPT_READFUNCTION, &sendAsyncHTTP);
-	curl_easy_setopt(m_curl, CURLOPT_READDATA, this);
+	MutexLock _(m_send_queue_lock);
+	m_send_queue.push(std::move(data));
+
 	/*
 	curl_easy_setopt(m_curl, CURLOPT_POSTFIELDSIZE, data.size());
 	curl_easy_setopt(m_curl, CURLOPT_POSTFIELDS, data.c_str()); // not copied!
@@ -127,6 +154,8 @@ void Connection::connect()
 			m_is_alive = false;
 			ERROR("pthread failed: " << strerror(status));
 		}
+	} else if (m_type == CT_WEBSOCKET) {
+		m_is_alive = true;
 	}
 	// For HTTP, the request is already done now.
 
@@ -274,27 +303,53 @@ void *Connection::recvAsyncStream(void *con_p)
 	return nullptr;
 }
 
-size_t Connection::recvAsyncHTTP(void *contents, size_t size, size_t nmemb, void *con_p)
+size_t Connection::recvAsyncHTTP(void *buffer, size_t size, size_t nitems, void *con_p)
 {
 	Connection *con = (Connection *)con_p;
 
 	MutexLock _(con->m_recv_queue_lock);
 	con->m_recv_queue.push(std::string());
 	auto &pkt = con->m_recv_queue.back();
-	pkt.resize(nmemb * size);
-	memcpy(&pkt[0], contents, pkt.size());
+	pkt.resize(nitems * size);
+	memcpy(&pkt[0], buffer, pkt.size());
 
 	return pkt.size();
 }
 
-size_t Connection::sendAsyncHTTP(void *contents, size_t size, size_t nmemb, void *con_p)
+size_t Connection::sendAsyncHTTP(void *buffer, size_t size, size_t nitems, void *con_p)
 {
 	Connection *con = (Connection *)con_p;
 
-	size_t to_send = std::min(nmemb * size, con->m_http_data.size() - con->m_http_data_index);
-	memcpy(contents, &con->m_http_data[con->m_http_data_index], to_send);
+	MutexLock _(con->m_send_queue_lock);
+	if (con->m_send_queue.empty())
+		return 0;
 
-	LOG("Write " << to_send << " bytes");
-	con->m_http_data_index += to_send;
+	std::string &what = con->m_send_queue.front();
+
+	size_t to_send = std::min(nitems * size, what.size() - con->m_send_index);
+	memcpy(buffer, &what[con->m_send_index], to_send);
+
+	con->m_send_index += to_send;
+	if (con->m_send_index >= what.size()) {
+		con->m_send_queue.pop();
+		con->m_send_index = 0;
+	}
+
 	return to_send;
+}
+
+size_t Connection::recvAsyncWebsocketHeader(void *buffer, size_t size, size_t nitems, void *con_p)
+{
+	Connection *con = (Connection *)con_p;
+
+	long response_code = 0;
+	curl_easy_getinfo(con->m_curl, CURLINFO_RESPONSE_CODE, &response_code);
+	if (response_code == 101) {
+		// Redirect OK
+	} else {
+		// Error?
+		//WARN("Got status code: " << response_code);
+	}
+
+	return nitems * size;
 }

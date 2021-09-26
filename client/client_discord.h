@@ -6,6 +6,13 @@
 class IModule;
 class Settings;
 
+enum DiscordStatus {
+	DS_IDLE,
+	DS_CONNECT,
+	DS_OBTAIN_TOKEN,
+	DS_STATUSINFO,
+};
+
 class ClientDiscord : public IClient {
 public:
 	ClientDiscord(Settings *settings);
@@ -24,10 +31,12 @@ public:
 protected:
 	void processRequest(ClientRequest &cr) {}
 	// Creates a new HTTP request
-	// post_json: picojson::object (manager by caller)
+	// post_json: picojson::object (managed by caller)
 	// return:    picojson::value  (managed by caller)
 	void *requestREST(cstr_t &method, cstr_t &url, void *post_json = nullptr);
 
 private:
+	DiscordStatus m_status = DS_IDLE;
+
 	std::string m_token;
 };

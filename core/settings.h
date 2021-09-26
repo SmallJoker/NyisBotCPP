@@ -46,6 +46,8 @@ public:
 	static bool isKeyValid(cstr_t &key);
 
 private:
+	cstr_t &getAbsolute(cstr_t &key) const;
+
 	mutable std::mutex m_lock;
 
 	std::string m_file;

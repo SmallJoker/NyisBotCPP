@@ -72,19 +72,25 @@ bool Settings::isKeyValid(cstr_t &str)
 	return true;
 }
 
-#define KEY_RAW(key) (m_prefix ? *m_prefix + key : key)
+#define KEY_ABS(key) (m_prefix ? *m_prefix + key : key)
 
-cstr_t &Settings::get(cstr_t &key) const
+cstr_t &Settings::getAbsolute(cstr_t &key_abs) const
 {
-	auto it = m_settings.find(KEY_RAW(key));
+	MutexLock _(m_lock);
+	auto it = m_settings.find(key_abs);
 	if (it != m_settings.end())
 		return it->second;
 
 	if (m_parent)
-		return m_parent->get(KEY_RAW(key));
+		return m_parent->getAbsolute(key_abs);
 
-	WARN("Attempt to access unknown setting " << KEY_RAW(key));
+	WARN("Attempt to access unknown setting " << key_abs);
 	return unknown_setting;
+}
+
+cstr_t &Settings::get(cstr_t &key) const
+{
+	return getAbsolute(KEY_ABS(key));
 }
 
 bool Settings::set(cstr_t &key, cstr_t &value)
@@ -96,7 +102,7 @@ bool Settings::set(cstr_t &key, cstr_t &value)
 
 	MutexLock _(m_lock);
 
-	std::string keyp = KEY_RAW(key);
+	std::string keyp = KEY_ABS(key);
 	m_modified.insert(keyp);
 	m_settings[keyp] = value;
 	return true;
@@ -113,6 +119,7 @@ bool Settings::set(cstr_t &key, SettingType *type)
 {
 	return set(key, type->serialize());
 }
+
 
 std::vector<std::string> Settings::getKeys() const
 {
@@ -131,7 +138,7 @@ std::vector<std::string> Settings::getKeys() const
 
 bool Settings::remove(cstr_t &key)
 {
-	std::string keyp = KEY_RAW(key);
+	std::string keyp = KEY_ABS(key);
 	MutexLock _(m_lock);
 
 	auto it = m_settings.find(keyp);
@@ -280,5 +287,5 @@ bool Settings::syncFileContents()
 	return true;
 }
 
-#undef KEY_RAW
+#undef KEY_ABS
 

@@ -139,7 +139,11 @@ public:
 		std::string cmd(get_next_part(msg));
 		if (cmd == "set") {
 			std::string key(get_next_part(msg));
-			m_settings->set(key, strtrim(msg));
+			if (msg.empty())
+				m_settings->remove(key);
+			else
+				m_settings->set(key, strtrim(msg));
+			c->notice(ui, "OK!");
 			return;
 		}
 		if (cmd == "get") {
@@ -149,6 +153,7 @@ public:
 		}
 		if (cmd == "save") {
 			saveSettings();
+			c->notice(ui, "OK!");
 			return;
 		}
 

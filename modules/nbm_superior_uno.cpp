@@ -321,7 +321,8 @@ public:
 		has_started = true;
 		m_initial_player_count = m_players.size();
 		current = *m_players.begin();
-		top_card = getPlayer(current)->cards[0];
+		UnoPlayer *p = getPlayer(current);
+		top_card = p->cards[get_random() % p->cards.size()];
 
 		turnNext();
 		return true;

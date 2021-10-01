@@ -19,24 +19,17 @@ public:
 		LOG("Unload");
 
 		saveSettings();
-		delete m_settings;
-	}
-
-	void initCommands(ChatCommand &cmd)
-	{
-		m_commands = &cmd;
-		cmd.add("$help",     (ChatCommandAction)&nbm_builtin::cmd_help,     this);
-		cmd.add("$remember", (ChatCommandAction)&nbm_builtin::cmd_remember, this);
-		cmd.add("$setting",  (ChatCommandAction)&nbm_builtin::cmd_setting, this);
 	}
 
 	void onClientReady()
 	{
-		if (m_settings)
-			return;
-
 		m_settings = getModuleMgr()->getSettings(this);
-		m_settings->syncFileContents();
+
+		ChatCommand &cmd = *getModuleMgr()->getChatCommand();
+		m_commands = &cmd;
+		cmd.add("$help",     (ChatCommandAction)&nbm_builtin::cmd_help,     this);
+		cmd.add("$remember", (ChatCommandAction)&nbm_builtin::cmd_remember, this);
+		cmd.add("$setting",  (ChatCommandAction)&nbm_builtin::cmd_setting, this);
 	}
 
 	bool onUserSay(Channel *c, UserInstance *ui, std::string &msg)
@@ -104,7 +97,7 @@ public:
 				m_settings->set(ui->nickname, bc->remember_text);
 		}
 
-		m_settings->syncFileContents();
+		m_settings->syncFileContents(SR_WRITE);
 	}
 
 	CHATCMD_FUNC(cmd_help)

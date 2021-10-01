@@ -45,47 +45,109 @@ Settings::~Settings()
 	delete m_prefix;
 }
 
+
+#define KEY_ABS(key) (m_prefix ? *m_prefix + key : key)
+
 Settings *Settings::fork(cstr_t &prefix)
 {
-	return new Settings(m_file, m_parent, m_prefix ? *m_prefix + prefix : prefix);
+	Settings *s = new Settings(m_file, this, KEY_ABS(prefix));
+	s->m_is_fork = true;
+	return s;
 }
 
-static std::string unknown_setting = "";
-	
+//  ================= Utility functions  =================
+
 bool Settings::isKeyValid(cstr_t &str)
 {
 	if (str.empty())
 		return false;
 
 	for (char c : str) {
-		if (c >= 'A' && c <= 'Z')
-			continue;
-		if (c >= 'a' && c <= 'z')
-			continue;
-		if (c >= '0' && c <= '9')
-			continue;
-		if (c == '_' || c == '.')
-			continue;
-
-		return false;
+		if (!isKeyCharValid(c))
+			return false;
 	}
 	return true;
 }
 
-#define KEY_ABS(key) (m_prefix ? *m_prefix + key : key)
-
-cstr_t &Settings::getAbsolute(cstr_t &key_abs) const
+void Settings::sanitizeKey(std::string &key)
 {
+	std::string blacklist(key.size(), '\0');
+	size_t b = 0, k = 0;
+	for (size_t i = 0; i < key.size(); ++i) {
+		if (!isKeyCharValid(key[i]) || key[i] == '.')
+			blacklist[b++] = key[i];
+		else
+			key[k++] = key[i];
+	}
+	if (k == key.size())
+		return; // None
+
+	uint32_t hash = hashELF32(&blacklist[0], b);
+	key.resize(k + 1 + 8);
+	snprintf(&key[k], key.size() - k + 1, "_%08X", hash);
+}
+
+void Settings::sanitizeValue(std::string &value)
+{
+	for (char &c : value) {
+		if (iscntrl(c))
+			c = ' ';
+	}
+}
+
+
+// ================= get, set, remove =================
+
+static std::string unknown_setting = "";
+cstr_t &Settings::getAbsolute(cstr_t &key) const
+{
+	if (m_is_fork)
+		return m_parent->getAbsolute(key);
+
 	MutexLock _(m_lock);
-	auto it = m_settings.find(key_abs);
+	auto it = m_settings.find(key);
 	if (it != m_settings.end())
 		return it->second;
 
 	if (m_parent)
-		return m_parent->getAbsolute(key_abs);
+		return m_parent->getAbsolute(key);
 
-	WARN("Attempt to access unknown setting " << key_abs);
+	WARN("Attempt to access unknown setting " << key);
 	return unknown_setting;
+}
+
+bool Settings::setAbsolute(cstr_t &key, cstr_t &value)
+{
+	if (m_is_fork)
+		return m_parent->setAbsolute(key, value);
+
+	if (!isKeyValid(key)) {
+		WARN("Invalid key '" << key << "'");
+		return false;
+	}
+
+	MutexLock _(m_lock);
+
+	m_modified.insert(key);
+	m_settings[key] = value;
+	sanitizeValue(m_settings[key]);
+	return true;
+}
+
+bool Settings::removeAbsolute(cstr_t &key)
+{
+	if (m_is_fork)
+		return m_parent->removeAbsolute(key);
+
+	MutexLock _(m_lock);
+
+	auto it = m_settings.find(key);
+	if (it == m_settings.end())
+		return false;
+
+	m_modified.insert(key);
+	m_settings.erase(it);
+	return true;
 }
 
 cstr_t &Settings::get(cstr_t &key) const
@@ -95,36 +157,43 @@ cstr_t &Settings::get(cstr_t &key) const
 
 bool Settings::set(cstr_t &key, cstr_t &value)
 {
-	if (!isKeyValid(key)) {
-		WARN("Invalid key '" << key << "'");
-		return false;
-	}
+	return setAbsolute(KEY_ABS(key), value);
+}
 
-	MutexLock _(m_lock);
-
-	std::string keyp = KEY_ABS(key);
-	m_modified.insert(keyp);
-	m_settings[keyp] = value;
-	return true;
+bool Settings::remove(cstr_t &key)
+{
+	return removeAbsolute(KEY_ABS(key));
 }
 
 
+// ================= SettingType-specific =================
+
 bool Settings::get(cstr_t &key, SettingType *type) const
 {
-	cstr_t &val = get(key);
+	cstr_t &val = getAbsolute(KEY_ABS(key));
 	return type->deSerialize(val);
 }
 
 bool Settings::set(cstr_t &key, SettingType *type)
 {
-	return set(key, type->serialize());
+	return setAbsolute(KEY_ABS(key), type->serialize());
 }
 
+#undef KEY_ABS
 
 std::vector<std::string> Settings::getKeys() const
 {
+	// Choose the appropriate members to access
+	auto *mutex = &m_lock;
+	const auto *map = &m_settings;
+	if (m_is_fork) {
+		mutex = &m_parent->m_lock;
+		map = &m_parent->m_settings;
+	}
+	MutexLock _(*mutex);
+
 	std::vector<std::string> keys;
-	for (const auto &it : m_settings) {
+	for (const auto &it : *map) {
 		if (m_prefix && it.first.find(*m_prefix) != 0)
 			continue;
 
@@ -136,28 +205,16 @@ std::vector<std::string> Settings::getKeys() const
 	return keys;
 }
 
-bool Settings::remove(cstr_t &key)
+bool Settings::syncFileContents(SyncReason reason)
 {
-	std::string keyp = KEY_ABS(key);
-	MutexLock _(m_lock);
+	if (m_is_fork)
+		return m_parent->syncFileContents(reason);
 
-	auto it = m_settings.find(keyp);
-	if (it == m_settings.end())
-		return false;
-
-	m_modified.insert(keyp);
-	m_settings.erase(it);
-	return true;
-}
-
-
-bool Settings::syncFileContents()
-{
 	MutexLock _(m_lock);
 
 	std::ifstream is(m_file);
 	if (!is.good()) {
-		if (m_modified.size() == 0) {
+		if (reason == SR_READ) {
 			WARN("File '" << m_file << "' not found");
 			return false;
 		}
@@ -173,8 +230,11 @@ bool Settings::syncFileContents()
 		is = std::ifstream(m_file);
 	}
 
+	if (m_modified.empty() && reason == SR_WRITE)
+		return true; // Nothing to do
+
 	std::string new_file = m_file + ".~new";
-	std::ofstream *of = m_modified.size() ?
+	std::ofstream *of = (!m_modified.empty() && reason != SR_READ) ?
 		new std::ofstream(new_file) : nullptr;
 
 	// List of keys to detect removed settings
@@ -286,6 +346,4 @@ bool Settings::syncFileContents()
 	}
 	return true;
 }
-
-#undef KEY_ABS
 

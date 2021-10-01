@@ -12,10 +12,8 @@
 
 class TUIhelper : public IModule {
 public:
-	TUIhelper(IClient *cli) :
-		m_client(cli) {}
-
-	void initCommands(ChatCommand &cmd)
+	TUIhelper(IClient *cli, ChatCommand &cmd) :
+		m_client(cli)
 	{
 		cmd.add("help",   (ChatCommandAction)&TUIhelper::cmd_help, this);
 		cmd.add("quit",   (ChatCommandAction)&TUIhelper::cmd_quit, this);
@@ -220,8 +218,7 @@ ClientTUI::ClientTUI(Settings *settings) :
 	IClient(settings)
 {
 	m_commands = new ChatCommand(nullptr);
-	m_helper = new TUIhelper(this);
-	m_helper->initCommands(*m_commands);
+	m_helper = new TUIhelper(this, *m_commands);
 }
 
 ClientTUI::~ClientTUI()
@@ -232,7 +229,6 @@ ClientTUI::~ClientTUI()
 		m_thread = 0;
 	}
 
-	delete m_commands;
 	delete m_helper;
 }
 

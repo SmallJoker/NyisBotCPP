@@ -29,6 +29,7 @@ struct ModuleInternal {
 
 	void *dll_handle = nullptr;
 	IModule *module = nullptr;
+	Settings *settings = nullptr;
 	std::string name;
 	std::string path;
 };
@@ -63,6 +64,8 @@ ModuleMgr::ModuleMgr(IClient *cli)
 {
 	m_client = cli;
 	m_commands = new ChatCommand(nullptr);
+	m_settings = new Settings("config/modules.conf");
+	m_settings->syncFileContents();
 
 	m_last_step = std::chrono::high_resolution_clock::now();
 }
@@ -71,11 +74,15 @@ ModuleMgr::~ModuleMgr()
 {
 	unloadModules();
 	delete m_commands;
+
+	m_settings->syncFileContents(SR_WRITE);
+	delete m_settings;
 }
 
 bool ModuleMgr::loadModules()
 {
-	if (m_modules.size() > 0)
+	MutexLock _(m_lock);
+	if (!m_modules.empty())
 		return false;
 
 	bool good = true;
@@ -120,10 +127,6 @@ bool ModuleMgr::reloadModule(std::string name, bool keep_data)
 		return true;
 	}
 
-	// This is really ugly
-	m_lock.unlock();
-	MutexLock _(m_lock);
-
 	name = NAME_PREFIX + name;
 
 	ModuleInternal *mi = nullptr;
@@ -137,6 +140,7 @@ bool ModuleMgr::reloadModule(std::string name, bool keep_data)
 
 	if (!mi) {
 		WARN("No such module: " << name);
+		m_lock.unlock();
 		return false;
 	}
 
@@ -164,11 +168,13 @@ bool ModuleMgr::reloadModule(std::string name, bool keep_data)
 			c->getContainers()->move(expired_ptr, mi->module);
 	}
 
+	m_lock.unlock();
 	return ok;
 }
 
 void ModuleMgr::unloadModules()
 {
+	MutexLock _(m_lock);
 	if (m_modules.empty())
 		return;
 
@@ -192,7 +198,6 @@ bool ModuleMgr::loadSingleModule(ModuleInternal *mi)
 		// std::set has unique keys
 		m_modules.insert(mi);
 
-		mi->module->initCommands(*m_commands);
 		if (m_client)
 			mi->module->onClientReady();
 	}
@@ -226,7 +231,12 @@ Settings *ModuleMgr::getSettings(IModule *module) const
 	if (!mi)
 		return nullptr;
 
-	return new Settings("config/modules.conf", nullptr, mi->name);
+	if (!mi->settings) {
+		mi->settings = m_settings->fork(mi->name);
+		mi->settings->syncFileContents();
+	}
+
+	return mi->settings;
 }
 
 Settings *ModuleMgr::getGlobalSettings() const
@@ -359,4 +369,7 @@ void ModuleInternal::unload(Network *net)
 
 	module = nullptr;
 	dll_handle = nullptr;
+
+	delete settings;
+	settings = nullptr;
 }

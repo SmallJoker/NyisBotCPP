@@ -15,7 +15,7 @@ IClient::IClient(Settings *settings)
 IClient::~IClient()
 {
 	if (m_settings)
-		m_settings->syncFileContents();
+		m_settings->syncFileContents(SR_WRITE);
 
 	delete m_module_mgr;
 	m_module_mgr = nullptr;

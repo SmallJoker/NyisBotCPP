@@ -1,5 +1,5 @@
 # This is for the --tui mode
-# ./loader --tui
+# ./loader --config tui
 # load ../tests/test_feeds.txt
 
 reload feeds

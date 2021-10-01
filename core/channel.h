@@ -77,13 +77,17 @@ public:
 	cstr_t &getName() const
 	{ return m_name; }
 
+	// Settings-safe name
+	cstr_t &getSettingsName() const
+	{ return m_name_settings; }
+
 	bool isPrivate() const
 	{ return isPrivate(m_name); }
 
 	static bool isPrivate(cstr_t &name)
 	{ return name[0] != '#'; }
 
-	bool isValid(UserInstance *ui) const;
+	bool contains(UserInstance *ui) const;
 
 	Containers *getContainers()
 	{ return m_containers; }
@@ -96,6 +100,7 @@ public:
 
 private:
 	std::string m_name;
+	std::string m_name_settings;
 
 	// Per-channel data
 	Containers *m_containers = nullptr;
@@ -110,13 +115,18 @@ public:
 	Channel *addChannel(cstr_t &name);
 	Channel *getChannel(cstr_t &name) const;
 	bool removeChannel(Channel *c);
-	bool isValid(Channel *c) const;
+	bool contains(Channel *c) const;
 
 	std::set<Channel *> &getAllChannels()
 	{ return m_channels; }
 
+	//void freeTempChannels();
+
 private:
+	//static const time_t TEMP_CHANNEL_TIMEOUT = 300;
+
 	std::string m_last_active_channel;
 
 	std::set<Channel *> m_channels;
+	//std::map<Channel *, time_t> m_channels_temp;
 };

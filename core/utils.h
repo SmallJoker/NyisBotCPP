@@ -5,10 +5,18 @@
 
 std::string strtrim(const std::string &str);
 std::vector<std::string> strsplit(const std::string &input, char delim = ' ');
+
+// Split off the next space-separated word from input
 std::string get_next_part(std::string &input);
+
+// 'true' on explicit "positive" values, 'false' otherwise
 bool is_yes(std::string what);
+
 int get_random();
 
+uint32_t hashELF32(const char *str, size_t length);
+
+// Processes modifiers like "+abc" and "-acd"
 void apply_user_modes(char *buf, const std::string &modifier);
 
 enum IRC_Color {

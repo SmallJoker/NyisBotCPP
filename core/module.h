@@ -25,7 +25,6 @@ class IModule : public ICallbackHandler {
 public:
 	virtual ~IModule() {}
 	// Extended callbacks
-	virtual void initCommands(ChatCommand &cmd) {}
 	virtual void onClientReady() {}
 	virtual void onStep(float time) {}
 
@@ -60,8 +59,12 @@ public:
 	bool loadModules();
 	bool reloadModule(std::string name, bool keep_data = false);
 	void unloadModules();
+
+	// Settings object owned by ModuleMgr
 	Settings *getSettings(IModule *module) const;
 	Settings *getGlobalSettings() const;
+	ChatCommand *getChatCommand() const
+	{ return m_commands; }
 
 	// Callback handlers
 	void onStep(float time);
@@ -80,4 +83,5 @@ private:
 	std::set<ModuleInternal *> m_modules;
 	ChatCommand *m_commands = nullptr;
 	IClient *m_client;
+	Settings *m_settings;
 };

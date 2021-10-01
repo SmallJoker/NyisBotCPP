@@ -1,6 +1,7 @@
 #include "channel.h"
 #include "client.h"
 #include "logger.h"
+#include "settings.h"
 
 
 // ================= UserInstance =================
@@ -82,12 +83,14 @@ bool IUserOwner::removeUser(UserInstance *ui)
 Channel::Channel(cstr_t &name, IClient *cli) :
 	IUserOwner(cli)
 {
-	if (isPrivate(name))
-		WARN("Attempt to add private channel " << name);
-
 	m_name = name;
 	m_client = cli;
 	m_containers = new Containers();
+
+	if (!isPrivate(name)) {
+		m_name_settings = name.substr(name[0] == '#');
+		Settings::sanitizeKey(m_name_settings);
+	}
 }
 
 Channel::~Channel()
@@ -100,7 +103,7 @@ Channel::~Channel()
 	m_users.clear();
 }
 
-bool Channel::isValid(UserInstance *ui) const
+bool Channel::contains(UserInstance *ui) const
 {
 	return m_users.find(ui) != m_users.end();
 }
@@ -180,7 +183,7 @@ bool Network::removeChannel(Channel *c)
 	return true;
 }
 
-bool Network::isValid(Channel *c) const
+bool Network::contains(Channel *c) const
 {
 	return m_channels.find(c) != m_channels.end();
 }

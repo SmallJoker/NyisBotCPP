@@ -81,7 +81,24 @@ bool is_yes(std::string what)
 
 int get_random()
 {
+	// Seeded by main()
 	return rand();
+}
+
+uint32_t hashELF32(const char *str, size_t length)
+{
+	// Source: http://www.partow.net/programming/hashfunctions/index.html
+	uint32_t hash = 0, x = 0;
+
+	for (size_t i = 0; i < length; ++str, ++i) {
+		hash = (hash << 4) + (*str);
+		if ((x = hash & 0xF0000000L) != 0) {
+			hash ^= (x >> 24);
+		}
+		hash &= ~x;
+	}
+
+	return hash;
 }
 
 void apply_user_modes(char *buf, const std::string &modifier)

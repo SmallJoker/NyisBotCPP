@@ -17,7 +17,7 @@ struct Feeds : public IContainer {
 	~Feeds()
 	{
 		if (settings)
-			settings->syncFileContents();
+			settings->syncFileContents(SR_WRITE);
 		delete settings;
 	}
 
@@ -30,18 +30,14 @@ public:
 	~nbm_feeds()
 	{
 		if (m_settings)
-			m_settings->syncFileContents();
-		delete m_settings;
+			m_settings->syncFileContents(SR_WRITE);
 	}
 
 	void onClientReady()
 	{
 		m_settings = getModuleMgr()->getSettings(this);
-	}
 
-	void initCommands(ChatCommand &cmd)
-	{
-		ChatCommand &lcmd = cmd.add("$feeds", this);
+		ChatCommand &lcmd = getModuleMgr()->getChatCommand()->add("$feeds", this);
 		lcmd.setMain((ChatCommandAction)&nbm_feeds::cmd_help);
 		lcmd.add("list",   (ChatCommandAction)&nbm_feeds::cmd_list, this);
 		lcmd.add("add",    (ChatCommandAction)&nbm_feeds::cmd_add, this);
@@ -85,8 +81,8 @@ public:
 		Feeds *f = (Feeds *)c->getContainers()->get(this);
 		if (!f) {
 			f = new Feeds();
-			// Assign required settings prefix -> trim '#' in front
-			f->settings = m_settings->fork(c->getName().substr(1));
+			// Assign required settings prefix
+			f->settings = m_settings->fork(c->getSettingsName());
 			f->settings->syncFileContents(); // read
 			c->getContainers()->set(this, f);
 		}

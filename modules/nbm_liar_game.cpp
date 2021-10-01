@@ -180,13 +180,10 @@ private:
 
 class nbm_liar_game : public IModule {
 public:
-	nbm_liar_game()
-	{
-	}
 
-	void initCommands(ChatCommand &cmd)
+	void onClientReady()
 	{
-		ChatCommand &lcmd = cmd.add("$lgame", this);
+		ChatCommand &lcmd = getModuleMgr()->getChatCommand()->add("$lgame", this);
 		lcmd.setMain((ChatCommandAction)&nbm_liar_game::cmd_help);
 		lcmd.add("join",  (ChatCommandAction)&nbm_liar_game::cmd_join, this);
 		lcmd.add("leave", (ChatCommandAction)&nbm_liar_game::cmd_leave, this);

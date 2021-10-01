@@ -29,8 +29,9 @@ struct MyTimebomb : public IContainer {
 
 class nbm_timebomb : public IModule {
 public:
-	void initCommands(ChatCommand &cmd)
+	void onClientReady()
 	{
+		ChatCommand &cmd = *getModuleMgr()->getChatCommand();
 		cmd.add("$timebomb", (ChatCommandAction)&nbm_timebomb::cmd_timebomb, this);
 		cmd.add("$cutwire",  (ChatCommandAction)&nbm_timebomb::cmd_cutwire, this);
 	}

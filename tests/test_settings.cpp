@@ -3,6 +3,7 @@
 #include "../core/logger.h"
 #include "../core/settings.h"
 #include <fstream>
+#include <memory> // std::unique_ptr
 
 class SettingsTestBoolean : public SettingType {
 public:
@@ -83,7 +84,6 @@ void test_Settings_read()
 	std::remove(filename.c_str());
 }
 
-
 void test_Settings_write()
 {
 	std::string filename(std::tmpnam(nullptr));
@@ -93,7 +93,12 @@ void test_Settings_write()
 	}
 
 	Settings sr(filename); // Reader
+	std::unique_ptr<Settings> sr_fork(sr.fork("unit"));
 	sr.syncFileContents();
+
+	// Fork test 1: Values must be read in
+	TEST_CHECK(sr_fork->get("baz") == "nyan");
+
 	{
 		Settings sw(filename); // Writer
 		sw.syncFileContents();
@@ -129,6 +134,9 @@ void test_Settings_write()
 		TEST_CHECK(sr.get("unit.newy", &my_sink));
 	}
 
+	// Fork test 1: Value updated after write
+	TEST_CHECK(sr_fork->get("baz") == "kittens are cute");
+
 	{
 		std::ifstream is(filename);
 		std::string tmp, entire;
@@ -158,6 +166,14 @@ void test_SettingType_util()
 	TEST_CHECK(SettingType::parseFloat(&pos, &floatval) == true);
 	TEST_CHECK(std::abs(floatval - 1.55E1f) < 0.001f);
 	TEST_CHECK(SettingType::parseLong(&pos, &longval) == false);
+
+	Settings::sanitizeKey(text);
+	auto parts = strsplit(text, '_');
+	TEST_CHECK(parts[0] == "2903C0FFEE155E1");
+	TEST_CHECK(parts[1].size() == 8);
+	text ="valid_key";
+	Settings::sanitizeKey(text);
+	TEST_CHECK(text == "valid_key");
 }
 
 void test_Settings(Unittest *ut)

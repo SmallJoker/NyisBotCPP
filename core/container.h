@@ -7,7 +7,6 @@
 
 class UserInstance;
 class Channel;
-struct ClientTodo;
 
 class ICallbackHandler {
 public:

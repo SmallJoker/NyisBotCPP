@@ -17,6 +17,7 @@ class ChatCommand {
 public:
 	ChatCommand(IModule *module);
 
+
 	void setMain(ChatCommandAction action)
 	{ m_action = action; }
 

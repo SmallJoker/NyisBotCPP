@@ -195,7 +195,7 @@ public:
 		}
 
 		if (m_settings)
-			m_settings->syncFileContents();
+			m_settings->syncFileContents(SR_WRITE);
 	}
 
 	enum UnoMode : uint8_t
@@ -356,13 +356,14 @@ public:
 	~nbm_superior_uno()
 	{
 		if (m_settings)
-			m_settings->syncFileContents();
-		delete m_settings;
+			m_settings->syncFileContents(SR_WRITE);
 	}
 
-	void initCommands(ChatCommand &cmd)
+	void onClientReady()
 	{
-		ChatCommand &uno = cmd.add("$uno", this);
+		m_settings = getModuleMgr()->getSettings(this);
+
+		ChatCommand &uno = getModuleMgr()->getChatCommand()->add("$uno", this);
 		uno.setMain((ChatCommandAction)&nbm_superior_uno::cmd_help);
 		uno.add("join",  (ChatCommandAction)&nbm_superior_uno::cmd_join);
 		uno.add("leave", (ChatCommandAction)&nbm_superior_uno::cmd_leave);
@@ -375,12 +376,6 @@ public:
 		m_commands = &uno;
 	}
 
-	void onClientReady()
-	{
-		m_settings = getModuleMgr()->getSettings(this);
-		m_settings->syncFileContents();
-	}
-
 	void onStep(float time)
 	{
 		if (m_waiting_for_auth.empty())
@@ -388,8 +383,8 @@ public:
 
 		auto &it = m_waiting_for_auth.front();
 
-		if (getNetwork()->isValid(it.c) &&
-				it.c->isValid(it.ui)) {
+		if (getNetwork()->contains(it.c) &&
+				it.c->contains(it.ui)) {
 
 			it.timeout += time;
 	

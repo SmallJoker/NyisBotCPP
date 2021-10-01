@@ -61,6 +61,7 @@ DLL_EXPORT int main(int argc, char *argv[])
 	settings_ro = new Settings("config/main.defaults.conf", nullptr);
 	settings_rw = new Settings("config/main." + config_type + ".conf", settings_ro);
 	settings_ro->syncFileContents();
+	settings_ro->set("_internal.type", config_type);
 	if (!settings_rw->syncFileContents())
 		exit(EXIT_FAILURE);
 

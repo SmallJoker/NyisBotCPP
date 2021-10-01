@@ -64,7 +64,9 @@ ModuleMgr::ModuleMgr(IClient *cli)
 {
 	m_client = cli;
 	m_commands = new ChatCommand(nullptr);
-	m_settings = new Settings("config/modules.conf");
+
+	cstr_t &type = m_client->getSettings()->get("_internal.type");
+	m_settings = new Settings("config/module." + type + ".conf");
 	m_settings->syncFileContents();
 
 	m_last_step = std::chrono::high_resolution_clock::now();

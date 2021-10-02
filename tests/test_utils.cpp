@@ -40,8 +40,17 @@ void test_Utils_irc_stuff()
 	TEST_CHECK(colorize_string(buf, IC_LIGHT_GREEN) == normal + "09 colorize me \x0F");
 }
 
+void test_Utils_base64()
+{
+	std::string data1 = "I";
+	std::string data2 = "SQ==";
+	TEST_CHECK(base64encode(&data1[0], data1.size()) == data2);
+	TEST_CHECK(base64decode(&data2[0], data2.size()) == data1);
+}
+
 void test_Utils(Unittest *ut)
 {
 	TEST_REGISTER(test_Utils_strops)
 	TEST_REGISTER(test_Utils_irc_stuff)
+	TEST_REGISTER(test_Utils_base64)
 }

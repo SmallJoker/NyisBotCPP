@@ -19,7 +19,7 @@ public:
 	void initialize();
 	bool run();
 
-	void sendRaw(cstr_t &text) const;
+	void sendRaw(cstr_t &text);
 	// Functions for Channel
 	void actionSay(Channel *c, cstr_t &text);
 	void actionReply(Channel *c, UserInstance *ui, cstr_t &text);
@@ -40,7 +40,7 @@ private:
 	void handleServerMessage(cstr_t &status, NetworkEvent *e);
 
 	void joinChannels();
-	void requestAccStatus(UserInstance *ui) const;
+	void requestAccStatus(UserInstance *ui);
 
 	Connection *m_con = nullptr;
 	static const ClientActionEntry s_actions[];
@@ -59,4 +59,8 @@ private:
 
 	// User mode. This should be enough space.
 	char m_user_modes[13] = "            ";
+
+	static const size_t SEND_QUEUE_MAX = 10;
+	mutable std::mutex m_send_queue_lock;
+	std::queue<std::string> m_send_queue;
 };

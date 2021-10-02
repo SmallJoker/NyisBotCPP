@@ -84,9 +84,19 @@ void ClientIRC::processRequest(ClientRequest &cr)
 	}
 }
 
-void ClientIRC::sendRaw(cstr_t &text) const
+// TODO: change this to an event queue made from struct { enum, union }
+void ClientIRC::sendRaw(cstr_t &text)
 {
-	m_con->send(text + '\n');
+	MutexLock _(m_send_queue_lock);
+	if (m_send_queue.size() >= SEND_QUEUE_MAX) {
+		ERROR("Queue hard limit reached. Spam flood?");
+
+		while (!m_send_queue.empty())
+			m_send_queue.pop();
+		return;
+	}
+
+	m_send_queue.push(text + '\n');
 }
 
 void ClientIRC::actionSay(Channel *c, cstr_t &text)
@@ -122,10 +132,19 @@ bool ClientIRC::run()
 		return false;
 	}
 
-	// Process incoming lines, one-by-one
-	std::unique_ptr<std::string> what(m_con->popRecv());
+	{
+		// Process send queue
+		MutexLock _(m_send_queue_lock);
+		if (!m_send_queue.empty()) {
+			m_con->send(m_send_queue.front());
+			m_send_queue.pop();
+		}
+	}
 
 	m_module_mgr->onStep(0);
+
+	// Process incoming lines, one-by-one
+	std::unique_ptr<std::string> what(m_con->popRecv());
 
 	if (!what)
 		return true;
@@ -452,7 +471,7 @@ void ClientIRC::joinChannels()
 	}
 }
 
-void ClientIRC::requestAccStatus(UserInstance *ui) const
+void ClientIRC::requestAccStatus(UserInstance *ui)
 {
 	if (ui->account == UserInstance::UserAccStatus::UAS_PENDING)
 		return;

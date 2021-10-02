@@ -31,7 +31,7 @@ public:
 	void addRequest(ClientRequest && cr);
 	void processRequests();
 
-	virtual void sendRaw(cstr_t &text) const {} // TODO: remove this
+	virtual void sendRaw(cstr_t &text) {} // TODO: remove this
 
 	virtual void actionSay(Channel *c, cstr_t &text) {}
 	virtual void actionReply(Channel *c, UserInstance *ui, cstr_t &text) {}

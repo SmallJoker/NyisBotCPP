@@ -27,3 +27,6 @@ enum IRC_Color {
 };
 
 std::string colorize_string(const std::string &str, IRC_Color color);
+
+std::string base64encode(const void *data, size_t len);
+std::string base64decode(const void *data, size_t len);

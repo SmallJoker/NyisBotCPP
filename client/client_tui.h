@@ -17,7 +17,7 @@ public:
 	void initialize();
 	bool run();
 
-	void sendRaw(cstr_t &text) const;
+	void sendRaw(cstr_t &text);
 	void actionSay(Channel *c, cstr_t &text);
 	void actionReply(Channel *c, UserInstance *ui, cstr_t &text);
 	void actionNotice(Channel *c, UserInstance *ui, cstr_t &text);

@@ -250,7 +250,7 @@ bool ClientTUI::run()
 	return m_is_alive;
 }
 
-void ClientTUI::sendRaw(cstr_t &text) const
+void ClientTUI::sendRaw(cstr_t &text)
 {
 	std::cout << text << std::endl;
 }

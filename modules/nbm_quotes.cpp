@@ -6,22 +6,24 @@
 #include <algorithm> // std::find
 #include <sstream>
 
-/*struct Quote : public SettingType {
+struct Quote : public SettingType {
 	bool deSerialize(cstr_t &str)
 	{
 		if (str.size() < 5)
 			return false;
-		
+		text = str;
+		writer = get_next_part(text);
+		return true;
 	}
 
 	std::string serialize() const
 	{
-		
+		return writer + " " + text;
 	}
 
 	std::string writer;
 	std::string text;
-};*/
+};
 
 class nbm_quotes : public IModule {
 public:
@@ -99,7 +101,10 @@ public:
 		std::string nickname = ui->nickname;
 		Settings::sanitizeKey(nickname);
 
-		m_settings->set(id, nickname + " " + msg);
+		Quote q;
+		q.writer = nickname;
+		q.text = msg;
+		m_settings->set(id, &q);
 		m_settings->set("id", id);
 		c->reply(ui, "Added as #" + id);
 		m_last_id++;
@@ -110,28 +115,36 @@ public:
 
 	CHATCMD_FUNC(cmd_get)
 	{
+		auto keys = m_settings->getKeys();
 		std::vector<std::string> matches;
-		long id = -1;
-		if (SettingType::parseLong(msg, &id))
-			matches.push_back(std::to_string(id));
+
+		if (msg.empty())
+			matches.push_back(keys[get_random() % keys.size()]);
+
+		if (matches.empty()) {
+			long id = -1;
+			if (SettingType::parseLong(msg, &id))
+				matches.push_back(std::to_string(id));
+		}
 
 		if (matches.empty()) {
 			// Search in all quotes
-			auto keys = m_settings->getKeys();
 			for (cstr_t &key : keys) {
 				if (m_settings->get(key).rfind(msg) != std::string::npos)
 					matches.push_back(key);
 			}
 		}
 
-		if (matches.empty()) {
-			c->reply(ui, "No matches. Either specify an ID or text to search");
-			return;
-		}
 		if (matches.size() == 1) {
-			c->say("[Quote #" + matches[0] + "] " + m_settings->get(matches[0]));
+			Quote q;
+			if (m_settings->get(matches[0], &q))
+				c->say(colorize_string("[Quote #" + matches[0] + "] ", IC_ORANGE) + q.text);
+			else
+				c->reply(ui, "Unknown or invalid quote #" + matches[0]);
 			return;
 		}
+
+		std::sort(matches.begin(), matches.end());
 		std::ostringstream ss;
 		ss << "Found following matches: ";
 		for (size_t i = 0; i < matches.size(); ++i) {

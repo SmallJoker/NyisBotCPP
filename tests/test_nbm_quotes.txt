@@ -1,0 +1,18 @@
+# This is for the --tui mode
+# ./loader --config tui
+# load ../tests/test_nbm_quotes.txt
+
+reload quotes
+
+channel add #test
+user add FOO #test
+user add BAR #test
+
+user say FOO #test $quote add <BAR> Funny text
+user say BAR #test $quote get 1
+user say BAR #test $quote get Funny
+
+step 100
+
+user say BAR #test $quote add <FOO> Second text
+user say BAR #test $quote get Second

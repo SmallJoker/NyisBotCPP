@@ -20,6 +20,7 @@ public:
 		cmd.add("exit",   (ChatCommandAction)&TUIhelper::cmd_quit, this);
 		cmd.add("load",   (ChatCommandAction)&TUIhelper::cmd_load, this);
 		cmd.add("reload", (ChatCommandAction)&TUIhelper::cmd_reload, this);
+		cmd.add("step",   (ChatCommandAction)&TUIhelper::cmd_step, this);
 
 		ChatCommand &c = cmd.add("channel", this);
 		c.add("list",   (ChatCommandAction)&TUIhelper::cmd_channel_list, this);
@@ -39,6 +40,7 @@ public:
 			"\t quit / exit\n"
 			"\t load <filename> (Execute commands from file)\n"
 			"\t reload <modulename> [<keep_data>]\n"
+			"\t step <seconds>\n"
 			"\t channel list\n"
 			"\t channel add    <name>\n"
 			"\t channel remove <name>\n"
@@ -82,6 +84,18 @@ public:
 		std::string name(get_next_part(msg));
 		bool keep_data = is_yes(msg);
 		getModuleMgr()->reloadModule(name, keep_data);
+	}
+
+	CHATCMD_FUNC(cmd_step)
+	{
+		const char *pos = msg.c_str();
+		float t = -1.0f;
+		SettingType::parseFloat(&pos, &t);
+		if (t <= 0.0f) {
+			sendRaw("Step size must be greater than 0.0s");
+			return;
+		}
+		getModuleMgr()->onStep(t);
 	}
 
 	CHATCMD_FUNC(cmd_channel_list)
@@ -245,7 +259,7 @@ void ClientTUI::initialize()
 bool ClientTUI::run()
 {
 	if (m_is_alive)
-		m_module_mgr->onStep(0);
+		m_module_mgr->onStep(-1);
 
 	return m_is_alive;
 }

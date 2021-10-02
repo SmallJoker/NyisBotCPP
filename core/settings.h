@@ -5,7 +5,7 @@
 #include <set>
 #include <unordered_map>
 
-class SettingType {
+struct SettingType {
 public:
 	virtual bool deSerialize(cstr_t &str)
 	{
@@ -76,22 +76,4 @@ private:
 	std::unordered_map<std::string, std::string> m_settings;
 	// List of modified entries since last save
 	std::set<std::string> m_modified;
-};
-
-
-class SettingTypeLong : public SettingType {
-public:
-	SettingTypeLong(long init = 0) : value(init) {}
-
-	bool deSerialize(cstr_t &str)
-	{
-		return sscanf(str.c_str(), "%li", &value) == 1;
-	}
-
-	std::string serialize() const
-	{
-		return std::to_string(value);
-	}
-
-	long value;
 };

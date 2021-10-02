@@ -14,14 +14,14 @@ IClient::IClient(Settings *settings)
 
 IClient::~IClient()
 {
-	if (m_settings)
-		m_settings->syncFileContents(SR_WRITE);
-
 	delete m_module_mgr;
 	m_module_mgr = nullptr;
 
 	delete m_network;
 	m_network = nullptr;
+
+	if (m_settings)
+		m_settings->syncFileContents(SR_WRITE);
 }
 
 void IClient::addRequest(ClientRequest && cr)

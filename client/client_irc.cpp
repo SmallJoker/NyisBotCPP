@@ -51,13 +51,13 @@ ClientIRC::~ClientIRC()
 void ClientIRC::initialize()
 {
 	m_nickname = m_settings->get("irc.nickname");
-	SettingTypeLong at; m_settings->get("irc.authtype", &at);
-	m_auth_type = at.value;
+	SettingType::parseLong(m_settings->get("irc.authtype"), &m_auth_type);
 
 	const std::string &addr = m_settings->get("irc.address");
-	SettingTypeLong port;     m_settings->get("irc.port", &port);
+	long port = 0;
+	SettingType::parseLong(m_settings->get("irc.port"), &port);
 
-	m_con = Connection::createStream(addr, port.value);
+	m_con = Connection::createStream(addr, port);
 	m_con->connect();
 	sendRaw("PING server");
 }
@@ -141,7 +141,7 @@ bool ClientIRC::run()
 		}
 	}
 
-	m_module_mgr->onStep(0);
+	m_module_mgr->onStep(-1);
 
 	// Process incoming lines, one-by-one
 	std::unique_ptr<std::string> what(m_con->popRecv());
@@ -422,8 +422,9 @@ void ClientIRC::handleAuthentication(cstr_t &status, NetworkEvent *e)
 		sendRaw("USER " + m_nickname + " foo bar :Generic description");
 		sendRaw("NICK " + m_nickname);
 
-		SettingTypeLong at; m_settings->get("irc.authtype", &at);
-		if (at.value > 0)
+		long type = 0;
+		SettingType::parseLong(m_settings->get("irc.authtype"), &type);
+		if (type > 0)
 			m_auth_status = AS_AUTHENTICATE;
 
 		m_network->addUser(m_nickname);

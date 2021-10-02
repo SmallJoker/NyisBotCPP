@@ -240,7 +240,8 @@ Settings *ModuleMgr::getSettings(IModule *module) const
 
 	if (!mi->settings) {
 		mi->settings = m_settings->fork(mi->name);
-		mi->settings->syncFileContents();
+		// No need to sync: forks are up-to-date. Let's do it anyway.
+		mi->settings->syncFileContents(SR_READ);
 	}
 
 	return mi->settings;
@@ -256,7 +257,9 @@ void ModuleMgr::onStep(float time)
 	MutexLock _(m_lock);
 
 	auto time_now = std::chrono::high_resolution_clock::now();
-	time = std::chrono::duration<float>(time_now - m_last_step).count();
+	// Allow custom intervals
+	if (time <= 0.0f)
+		time = std::chrono::duration<float>(time_now - m_last_step).count();
 
 	if (time < 0.2f)
 		return;

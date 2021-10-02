@@ -38,10 +38,12 @@ Settings::Settings(cstr_t &filename, Settings *parent, cstr_t &prefix)
 
 	if (!prefix.empty())
 		m_prefix = new std::string(prefix + '.');
+	VERBOSE("file=" << m_file << ", prefix=" << (m_prefix ? *m_prefix : "(null)"));
 }
 
 Settings::~Settings()
 {
+	VERBOSE("file=" << m_file << ", prefix=" << (m_prefix ? *m_prefix : "(null)"));
 	delete m_prefix;
 }
 

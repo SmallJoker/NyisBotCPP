@@ -43,7 +43,7 @@ bool Unittest::runTests()
 			num_pass++;
 		} catch (std::string e) {
 			std::cout << "\tFAIL: " << e << std::endl;
-		} catch (std::exception e) {
+		} catch (std::exception &e) {
 			std::cout << "\tFAIL: " << e.what() << std::endl;
 		}
 		num_run++;

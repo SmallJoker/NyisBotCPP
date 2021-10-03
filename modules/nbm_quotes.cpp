@@ -135,6 +135,10 @@ public:
 			}
 		}
 
+		if (matches.empty()) {
+			c->reply(ui, "No matches. Either specify an ID or text to search");
+			return;
+		}
 		if (matches.size() == 1) {
 			Quote q;
 			if (m_settings->get(matches[0], &q))

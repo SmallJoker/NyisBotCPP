@@ -6,6 +6,7 @@ build/
 *.kdev4
 
 config/
+debug.txt
 
 # Generated stuff
 CMakeFiles/

@@ -10,7 +10,6 @@
 #include <memory>
 #include <pugixml.hpp>
 
-
 struct Feeds : public IContainer {
 	std::string dump() const { return "Feeds"; }
 
@@ -83,7 +82,7 @@ public:
 			f = new Feeds();
 			// Assign required settings prefix
 			f->settings = m_settings->fork(c->getSettingsName());
-			f->settings->syncFileContents(); // read
+			f->settings->syncFileContents(); // not necessary, but do anyway
 			c->getContainers()->set(this, f);
 		}
 		return f;
@@ -128,6 +127,7 @@ public:
 		}
 
 		time_t last_update = time(nullptr);
+		time_t time_newest = 0;
 		{
 			auto it = f->last_update.find(key);
 			if (it != f->last_update.end())
@@ -146,15 +146,21 @@ public:
 			auto date = it.node().child_value("updated");
 
 			tm timeinfo;
-			if (!strptime(date, "%FT%TZ", &timeinfo))
+			if (!strptime(date, "%FT%TZ", &timeinfo)) {
+				LOG("Invalid date: " << title << " date=" << date);
 				continue; // Invalid date
+			}
 
-			time_t unix_time = mktime(&timeinfo);
-			if (unix_time <= last_update)
+			time_t timestamp = mktime(&timeinfo);
+			if (timestamp <= last_update) {
+				LOG("Skip: " << title << " dtime=" << (timestamp - last_update));
 				continue; // Skip old information
+			}
 
-			if (msg_limit-- == 0)
+			if (msg_limit-- == 0) {
+				LOG("Limit reached!");
 				break; // Rate limit
+			}
 
 			auto parts = strsplit(link, '/');
 			std::string out;
@@ -162,8 +168,11 @@ public:
 			out.append(" @").append(colorize_string(parts[3], IC_MAROON)); // @projectname
 			out.append(": ").append(colorize_string(title, IC_LIGHT_GRAY)); // : title
 			c->say(out);
+
+			if (timestamp > time_newest)
+				time_newest = timestamp;
 		}
-		f->last_update[key] = time(nullptr);
+		f->last_update[key] = time_newest;
 
 		return nullptr;
 	}

@@ -32,6 +32,26 @@ public:
 		cmd.add("$setting",  (ChatCommandAction)&nbm_builtin::cmd_setting, this);
 	}
 
+	void onUserStatusUpdate(UserInstance *ui, bool is_timeout)
+	{
+		auto it = m_status_updates.find(ui);
+		if (it == m_status_updates.end())
+			return;
+
+		Channel *c = it->second;
+		m_status_updates.erase(it);
+
+		if (!getNetwork()->contains(c))
+			return;
+		if (!c->contains(ui))
+			return;
+
+		if (is_timeout)
+			c->notice(ui, "Auth request timed out. Bot error?");
+		else
+			c->notice(ui, "OK. Updated! Status: " + std::to_string(ui->account));
+	}
+
 	bool onUserSay(Channel *c, UserInstance *ui, std::string &msg)
 	{
 		std::string cmd(get_next_part(msg));
@@ -39,7 +59,7 @@ public:
 			return false;
 
 		if (cmd == "$reload") {
-			if (!isBotAdmin(c, ui))
+			if (!checkBotAdmin(c, ui))
 				return true;
 
 			std::string module(get_next_part(msg));
@@ -50,39 +70,29 @@ public:
 			return true;
 		}
 		if (cmd == "$quit") {
-			if (!isBotAdmin(c, ui))
+			if (!checkBotAdmin(c, ui))
 				return true;
 
 			sendRaw("QUIT :Goodbye!");
 			return true;
 		}
-		if (cmd == "$list") {
-			std::string list("List: ");
-			for (UserInstance *ui : c->getAllUsers()) {
-				list.append(ui->nickname);
-				list.append("_");
+		if (cmd == "$modules") {
+			std::string text("Loaded modules:");
+			for (cstr_t &name : getModuleMgr()->getModuleList()) {
+				text.append(" " + name);
 			}
-			c->say(list);
+			c->say(text);
 			return true;
 		}
 		if (cmd == "$updateauth") {
+			m_status_updates[ui] = c;
 			addClientRequest(ClientRequest {
 				.type = ClientRequest::RT_STATUS_UPDATE,
-				.status_update_nick = new std::string(ui->nickname)
+				.status_update = ui
 			});
 			return true;
 		}
 
-		return false;
-	}
-
-	bool isBotAdmin(Channel *c, UserInstance *ui)
-	{
-		cstr_t &admin = getModuleMgr()->getGlobalSettings()->get("client.admin");
-		if (ui->nickname == admin && ui->account == UserInstance::UAS_LOGGED_IN)
-			return true;
-
-		c->reply(ui, "Insufficient privileges.");
 		return false;
 	}
 
@@ -154,6 +164,7 @@ public:
 	}
 
 private:
+	std::map<UserInstance *, Channel *> m_status_updates;
 	Settings *m_settings = nullptr;
 	ChatCommand *m_commands = nullptr;
 };

@@ -1,3 +1,4 @@
+dofile("script/misc_helpers.lua")
 
 local function register_callbacks(name)
 	local cb = {}
@@ -19,12 +20,10 @@ register_callbacks("on_user_say")
 function bot.run_callbacks(name, mode, ...)
 	local cb = bot["callbacks_" .. name]
 	for _, func in ipairs(cb) do
-		local val = { pcall(func, ...) }
-		if not val[1] then
-			print(name .. " callback failed: " .. val[2])
-		elseif mode == 1 then
+		local val = { func(...) }
+		if mode == 1 then
 			-- Abort on true
-			if val[2] then
+			if val[1] then
 				return true
 			end
 		else

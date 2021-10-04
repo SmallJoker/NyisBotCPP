@@ -64,14 +64,23 @@ public:
 	{
 		lua_getglobal(m_lua, "bot");
 		lua_getfield(m_lua, -1, "run_callbacks");
-		lua_pushstring(m_lua, name); // name
-		lua_pushnumber(m_lua, (int)mode);    // mode
+		lua_pushstring(m_lua, name);
+		lua_pushnumber(m_lua, (int)mode);
 	}
 
-	void executeCallback(int nresults = 0)
+	void executeCallback(Channel *c = nullptr, UserInstance *ui = nullptr, int nresults = 0)
 	{
 		int nargs = lua_gettop(m_lua);
-		lua_call(m_lua, nargs - 2, nresults);
+		if (lua_pcall(m_lua, nargs - 2, nresults, 0)) {
+			std::string err(lua_tostring(m_lua, -1));
+			if (c && ui)
+				c->reply(ui, err);
+			else if (c)
+				c->say("Lua error: " + err);
+			else
+				ERROR(err);
+		}
+
 		lua_settop(m_lua, -nresults);
 	}
 
@@ -114,13 +123,18 @@ public:
 		}
 		is.close();
 
-		bool ok = !luaL_loadfile(m_lua, filename.c_str());
-		ok &= !lua_pcall(m_lua, 0, 0, 0);
-		if (!ok) {
+		if (luaL_dofile(m_lua, filename.c_str())) {
 			const char *err = lua_tostring(m_lua, -1);
-			return std::string("Script failed to execute: ") + (err ? err : "(no information)");
+			std::string msg("Script failed to execute: ");
+			msg.append(err ? err : "(no information)");
+
+			lua_settop(m_lua, 0);
+			lua_close(m_lua);
+			m_lua = nullptr;
+			return msg;
 		}
-		lua_pop(m_lua, lua_gettop(m_lua));
+
+		lua_settop(m_lua, 0);
 		return "";
 	}
 
@@ -130,6 +144,7 @@ public:
 	{
 		m_settings = getModuleMgr()->getSettings(this);
 
+		if (!m_lua) return;
 		lua_getglobal(m_lua, "bot");
 		{
 			lua_pushstring(m_lua, "settings");
@@ -144,24 +159,31 @@ public:
 
 	void onStep(float time)
 	{
+		if (!m_lua) return;
+		prepareCallback("on_step", CBEM_NO_ABORT);
+		lua_pushnumber(m_lua, time);
+		executeCallback();
 	}
 	
 	void onChannelJoin(Channel *c)
 	{
+		if (!m_lua) return;
 		prepareCallback("on_channel_join", CBEM_NO_ABORT);
 		lua_pushstring(m_lua, c->getName().c_str());
-		executeCallback();
+		executeCallback(c);
 	}
 
 	void onChannelLeave(Channel *c)
 	{
+		if (!m_lua) return;
 		prepareCallback("on_channel_leave", CBEM_NO_ABORT);
 		ChannelRef::create(m_lua, m_client->getNetwork(), c);
-		executeCallback();
+		executeCallback(c);
 	}
 
 	void onUserJoin(Channel *c, UserInstance *ui)
 	{
+		if (!m_lua) return;
 		prepareCallback("on_user_join", CBEM_NO_ABORT);
 		ChannelRef::create(m_lua, m_client->getNetwork(), c);
 		lua_pushlightuserdata(m_lua, ui);
@@ -170,6 +192,7 @@ public:
 
 	void onUserLeave(Channel *c, UserInstance *ui)
 	{
+		if (!m_lua) return;
 		prepareCallback("on_user_leave", CBEM_NO_ABORT);
 		ChannelRef::create(m_lua, m_client->getNetwork(), c);
 		lua_pushlightuserdata(m_lua, ui);
@@ -178,6 +201,7 @@ public:
 
 	void onUserRename(UserInstance *ui, const std::string &old_name)
 	{
+		if (!m_lua) return;
 		prepareCallback("on_user_rename", CBEM_NO_ABORT);
 		lua_pushlightuserdata(m_lua, ui);
 		lua_pushstring(m_lua, old_name.c_str());
@@ -186,11 +210,12 @@ public:
 
 	bool onUserSay(Channel *c, UserInstance *ui, std::string &msg)
 	{
+		if (!m_lua) return false;
 		prepareCallback("on_user_say", CBEM_ABORT_ON_TRUE);
 		ChannelRef::create(m_lua, m_client->getNetwork(), c);
 		lua_pushlightuserdata(m_lua, ui);
 		lua_pushstring(m_lua, msg.c_str());
-		executeCallback(1);
+		executeCallback(c, ui, 1);
 		bool ok = lua_toboolean(m_lua, -1);
 		lua_settop(m_lua, 0);
 		return ok;

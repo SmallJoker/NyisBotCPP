@@ -57,6 +57,16 @@ void IModule::addClientRequest(ClientRequest && cr)
 	m_client->addRequest(std::move(cr));
 }
 
+bool IModule::checkBotAdmin(Channel *c, UserInstance *ui) const
+{
+	cstr_t &admin = getModuleMgr()->getGlobalSettings()->get("client.admin");
+	if (ui->nickname == admin && ui->account == UserInstance::UAS_LOGGED_IN)
+		return true;
+
+	c->reply(ui, "Insufficient privileges.");
+	return false;
+}
+
 
 // ================= ModuleMgr =================
 
@@ -197,6 +207,15 @@ void ModuleMgr::unloadModules()
 	*m_commands = ChatCommand(nullptr); // reset
 }
 
+std::vector<std::string> ModuleMgr::getModuleList() const
+{
+	std::vector<std::string> list;
+	for (ModuleInternal *it : m_modules)
+		list.emplace_back(it->name);
+
+	return list;
+}
+
 bool ModuleMgr::loadSingleModule(ModuleInternal *mi)
 {
 	bool ok = mi->load(m_client);
@@ -268,6 +287,20 @@ void ModuleMgr::onStep(float time)
 
 	for (ModuleInternal *mi : m_modules)
 		mi->module->onStep(time);
+
+	std::vector<UserInstance *> to_execute;
+	for (auto &[ui, countdown] : m_status_update_timeout) {
+		countdown -= time;
+		if (countdown <= 0.0f)
+			to_execute.emplace_back(ui);
+	}
+	for (UserInstance *ui : to_execute) {
+		m_lock.unlock();
+		// Trigger timeout callback
+		// WARNING: "ui" might be invalid
+		onUserStatusUpdate(ui, true);
+		m_lock.lock();
+	}
 }
 
 void ModuleMgr::onChannelJoin(Channel *c)
@@ -323,6 +356,18 @@ bool ModuleMgr::onUserSay(Channel *c, UserInstance *ui, std::string &msg)
 	return false;
 }
 
+void ModuleMgr::onUserStatusUpdate(UserInstance *ui, bool is_timeout)
+{
+	MutexLock _(m_lock);
+	m_status_update_timeout.erase(ui);
+	for (ModuleInternal *mi : m_modules)
+		mi->module->onUserStatusUpdate(ui, is_timeout);
+}
+
+void ModuleMgr::client_privatefunc_1(UserInstance *ui)
+{
+	m_status_update_timeout[ui] = 3;
+}
 
 // ================= ModuleInternal =================
 

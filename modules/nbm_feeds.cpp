@@ -88,16 +88,6 @@ public:
 		return f;
 	}
 
-	bool isBotAdmin(Channel *c, UserInstance *ui)
-	{
-		cstr_t &admin = getModuleMgr()->getGlobalSettings()->get("client.admin");
-		if (ui->nickname == admin && ui->account == UserInstance::UAS_LOGGED_IN)
-			return true;
-
-		c->reply(ui, "Insufficient privileges.");
-		return false;
-	}
-
 	const char *notifySingle(Channel *c, cstr_t &key, Feeds *f)
 	{
 #if 1
@@ -198,7 +188,7 @@ public:
 
 	CHATCMD_FUNC(cmd_add)
 	{
-		if (!isBotAdmin(c, ui))
+		if (!checkBotAdmin(c, ui))
 			return;
 		Feeds *f = getFeedsOrCreate(c);
 		if (!f)
@@ -228,7 +218,7 @@ public:
 
 	CHATCMD_FUNC(cmd_remove)
 	{
-		if (!isBotAdmin(c, ui))
+		if (!checkBotAdmin(c, ui))
 			return;
 		Feeds *f = getFeedsOrCreate(c);
 		if (!f)

@@ -58,7 +58,6 @@ UserInstance *IUserOwner::getUser(cstr_t &name) const
 	return nullptr;
 }
 
-
 bool IUserOwner::removeUser(UserInstance *ui)
 {
 	auto it = m_users.find(ui);
@@ -75,6 +74,11 @@ bool IUserOwner::removeUser(UserInstance *ui)
 	ui->dropRef();
 	m_users.erase(it);
 	return true;
+}
+
+bool IUserOwner::contains(UserInstance *ui) const
+{
+	return m_users.find(ui) != m_users.end();
 }
 
 
@@ -101,11 +105,6 @@ Channel::~Channel()
 	for (UserInstance *ui : m_users)
 		ui->dropRef();
 	m_users.clear();
-}
-
-bool Channel::contains(UserInstance *ui) const
-{
-	return m_users.find(ui) != m_users.end();
 }
 
 void Channel::say(cstr_t &text)

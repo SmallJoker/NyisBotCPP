@@ -509,7 +509,7 @@ public:
 			} else if (ui->account == UserInstance::UAS_UNKNOWN) {
 				addClientRequest(ClientRequest {
 					.type = ClientRequest::RT_STATUS_UPDATE,
-					.status_update_nick = new std::string(ui->nickname)
+					.status_update = ui
 				});
 				m_waiting_for_auth.push(WaitingForAuth {
 					.ui = ui,

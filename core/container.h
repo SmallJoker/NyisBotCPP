@@ -18,6 +18,7 @@ public:
 	virtual void onUserLeave(Channel *c, UserInstance *ui) {}
 	virtual void onUserRename(UserInstance *ui, const std::string &old_name) {}
 	virtual bool onUserSay(Channel *c, UserInstance *ui, std::string &msg) { return false; }
+	virtual void onUserStatusUpdate(UserInstance *ui, bool is_timeout) {}
 };
 
 

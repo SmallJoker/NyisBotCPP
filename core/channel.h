@@ -58,6 +58,7 @@ public:
 	UserInstance *addUser(cstr_t &name);
 	UserInstance *getUser(cstr_t &name) const;
 	bool removeUser(UserInstance *ui);
+	bool contains(UserInstance *ui) const;
 
 	std::set<UserInstance *> &getAllUsers()
 	{ return m_users; }
@@ -87,8 +88,6 @@ public:
 	static bool isPrivate(cstr_t &name)
 	{ return name[0] != '#'; }
 
-	bool contains(UserInstance *ui) const;
-
 	Containers *getContainers()
 	{ return m_containers; }
 
@@ -107,7 +106,7 @@ private:
 };
 
 
-class Network : public ICallbackHandler, public IUserOwner {
+class Network : public IUserOwner {
 public:
 	Network(IClient *cli) : IUserOwner(cli) {}
 	~Network();

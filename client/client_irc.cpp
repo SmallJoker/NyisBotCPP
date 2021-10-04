@@ -75,10 +75,10 @@ void ClientIRC::processRequest(ClientRequest &cr)
 				cr.reload_module.keep_data);
 			return;
 		case ClientRequest::RT_STATUS_UPDATE:
-			UserInstance *ui = m_network->getUser(*cr.status_update_nick);
+			if (!((IUserOwner *)m_network)->contains(cr.status_update))
+				return;
 
-			if (ui)
-				requestAccStatus(ui);
+			requestAccStatus(cr.status_update);
 			return;
 		//default: return;
 	}
@@ -235,7 +235,7 @@ void ClientIRC::handleError(cstr_t &status, NetworkEvent *e)
 void ClientIRC::handleClientEvent(cstr_t &status, NetworkEvent *e)
 {
 	VERBOSE("Client event: " << status);
-	e->dump();
+	//e->dump();
 
 	if (status == "JOIN") {
 		// nick!host JOIN :channel
@@ -385,8 +385,10 @@ void ClientIRC::handleChatMessage(cstr_t &status, NetworkEvent *e)
 		VERBOSE(args[0] << "|" << args[1] << " -> " << status);
 
 		UserInstance *ui = nick ? m_network->getUser(*nick) : nullptr;
-		if (ui)
+		if (ui) {
 			ui->account = static_cast<UserInstance::UserAccStatus>(status);
+			m_module_mgr->onUserStatusUpdate(ui, false);
+		}
 		return;
 	}
 	if (status == "PRIVMSG") {

@@ -45,6 +45,10 @@ void IClient::processRequests()
 	}
 
 	VERBOSE("Got request type=" << (int)cr.type);
+
+	if (cr.type == ClientRequest::RT_STATUS_UPDATE)
+		m_module_mgr->client_privatefunc_1(cr.status_update);
+
 	processRequest(cr);
 
 	// Clean up data
@@ -55,7 +59,6 @@ void IClient::processRequests()
 			delete cr.reload_module.path;
 			return;
 		case ClientRequest::RT_STATUS_UPDATE:
-			delete cr.status_update_nick;
 			return;
 	}
 }

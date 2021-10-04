@@ -37,6 +37,7 @@ protected:
 	Network *getNetwork() const;
 	void sendRaw(cstr_t &what) const; // TODO: remove me
 	void addClientRequest(ClientRequest && cr);
+	bool checkBotAdmin(Channel *c, UserInstance *ui) const;
 
 	IClient *m_client = nullptr;
 
@@ -64,6 +65,8 @@ public:
 	ChatCommand *getChatCommand() const
 	{ return m_commands; }
 
+	std::vector<std::string> getModuleList() const;
+
 	// Callback handlers
 	void onStep(float time);
 	void onChannelJoin(Channel *c);
@@ -72,6 +75,10 @@ public:
 	void onUserLeave(Channel *c, UserInstance *ui);
 	void onUserRename(UserInstance *ui, cstr_t &old_name);
 	bool onUserSay(Channel *c, UserInstance *ui, std::string &msg);
+	void onUserStatusUpdate(UserInstance *ui, bool is_timeout);
+
+	// Add to status update queue
+	void client_privatefunc_1(UserInstance *ui);
 private:
 	bool loadSingleModule(ModuleInternal *mi);
 	void unloadSingleModule(ModuleInternal *mi, bool keep_data = false);
@@ -82,4 +89,6 @@ private:
 	ChatCommand *m_commands = nullptr;
 	IClient *m_client;
 	Settings *m_settings;
+
+	std::map<UserInstance *, float> m_status_update_timeout;
 };

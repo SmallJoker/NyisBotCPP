@@ -287,7 +287,7 @@ bool Settings::syncFileContents(SyncReason reason)
 			}
 			all_keys.insert(key);
 
-			if (m_modified.find(key) != m_modified.end()) {
+			if (of && m_modified.find(key) != m_modified.end()) {
 				// Modified setting
 				m_modified.erase(key);
 				line_status = LS_HANDLED;
@@ -319,8 +319,10 @@ bool Settings::syncFileContents(SyncReason reason)
 	}
 
 	// Append new settings
-	for (cstr_t &key : m_modified)
-		*of << key << " = " << m_settings[key] << std::endl;
+	if (of) {
+		for (cstr_t &key : m_modified)
+			*of << key << " = " << m_settings[key] << std::endl;
+	}
 
 	// Remove removed values
 	for (auto kv = m_settings.cbegin(); kv != m_settings.cend(); /*NOP*/) {

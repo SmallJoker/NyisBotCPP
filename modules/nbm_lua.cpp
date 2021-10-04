@@ -1,11 +1,13 @@
-#include "channel.h"
 #include "chatcommand.h"
+#include "client.h"
 #include "logger.h"
 #include "module.h"
-#include "settings.h"
 #include "utils.h"
 #include <fstream>
 #include <sstream>
+
+#include "lua_channel.cpp"
+#include "lua_settings.cpp"
 
 extern "C" {
 #include <lua.h>
@@ -20,6 +22,8 @@ extern "C" {
 #endif
 
 static const char MODULE_INDEX = '\0';
+
+class SettingsRef;
 
 class nbm_lua : public IModule {
 public:
@@ -51,19 +55,24 @@ public:
 		lua_pop(m_lua, 1); // "bot"
 	}
 
-	void prepareCallback(const char *name)
+	enum CallbackExecutionMode {
+		CBEM_NO_ABORT,
+		CBEM_ABORT_ON_TRUE
+	};
+
+	void prepareCallback(const char *name, CallbackExecutionMode mode)
 	{
 		lua_getglobal(m_lua, "bot");
 		lua_getfield(m_lua, -1, "run_callbacks");
 		lua_pushstring(m_lua, name); // name
-		lua_pushnumber(m_lua, 0);    // mode
+		lua_pushnumber(m_lua, (int)mode);    // mode
 	}
 
-	void executeCallback()
+	void executeCallback(int nresults = 0)
 	{
 		int nargs = lua_gettop(m_lua);
-		lua_call(m_lua, nargs - 2, 0);
-		lua_settop(m_lua, 0);
+		lua_call(m_lua, nargs - 2, nresults);
+		lua_settop(m_lua, -nresults);
 	}
 
 	std::string resetLua()
@@ -91,8 +100,12 @@ public:
 		lua_setglobal(m_lua, "print");
 		lua_pushcfunction(m_lua, l_error);
 		lua_setglobal(m_lua, "error");
-		lua_pushcfunction(m_lua, l_test);
-		lua_setglobal(m_lua, "test");
+
+		{
+			// Class initializations
+			SettingsRef::initialize(m_lua);
+			ChannelRef::initialize(m_lua);
+		}
 
 		const std::string filename = "script/init.lua";
 		std::ifstream is(filename);
@@ -117,7 +130,15 @@ public:
 	{
 		m_settings = getModuleMgr()->getSettings(this);
 
-		prepareCallback("on_client_ready");
+		lua_getglobal(m_lua, "bot");
+		{
+			lua_pushstring(m_lua, "settings");
+			SettingsRef::create(m_lua, m_settings);
+			lua_settable(m_lua, -3);
+		}
+		lua_pop(m_lua, 1);
+
+		prepareCallback("on_client_ready", CBEM_NO_ABORT);
 		executeCallback();
 	}
 
@@ -127,35 +148,52 @@ public:
 	
 	void onChannelJoin(Channel *c)
 	{
-		prepareCallback("on_channel_join");
+		prepareCallback("on_channel_join", CBEM_NO_ABORT);
 		lua_pushstring(m_lua, c->getName().c_str());
 		executeCallback();
 	}
 
 	void onChannelLeave(Channel *c)
 	{
-		
+		prepareCallback("on_channel_leave", CBEM_NO_ABORT);
+		ChannelRef::create(m_lua, m_client->getNetwork(), c);
+		executeCallback();
 	}
 
 	void onUserJoin(Channel *c, UserInstance *ui)
 	{
-		
+		prepareCallback("on_user_join", CBEM_NO_ABORT);
+		ChannelRef::create(m_lua, m_client->getNetwork(), c);
+		lua_pushlightuserdata(m_lua, ui);
+		executeCallback();
 	}
 
 	void onUserLeave(Channel *c, UserInstance *ui)
 	{
-		
+		prepareCallback("on_user_leave", CBEM_NO_ABORT);
+		ChannelRef::create(m_lua, m_client->getNetwork(), c);
+		lua_pushlightuserdata(m_lua, ui);
+		executeCallback();
 	}
 
 	void onUserRename(UserInstance *ui, const std::string &old_name)
 	{
-		
+		prepareCallback("on_user_rename", CBEM_NO_ABORT);
+		lua_pushlightuserdata(m_lua, ui);
+		lua_pushstring(m_lua, old_name.c_str());
+		executeCallback();
 	}
 
 	bool onUserSay(Channel *c, UserInstance *ui, std::string &msg)
 	{
-		return false;
-		
+		prepareCallback("on_user_say", CBEM_ABORT_ON_TRUE);
+		ChannelRef::create(m_lua, m_client->getNetwork(), c);
+		lua_pushlightuserdata(m_lua, ui);
+		lua_pushstring(m_lua, msg.c_str());
+		executeCallback(1);
+		bool ok = lua_toboolean(m_lua, -1);
+		lua_settop(m_lua, 0);
+		return ok;
 	}
 
 	// ================= Lua-exposed functions =================
@@ -165,7 +203,11 @@ public:
 		// https://www.lua.org/pil/27.3.1.html
 		lua_pushlightuserdata(L, (void *)&MODULE_INDEX);
 		lua_gettable(L, LUA_REGISTRYINDEX);
-		return (nbm_lua *)lua_touserdata(L, -1);
+		nbm_lua *m = (nbm_lua *)lua_touserdata(L, -1);
+		if (!m->m_settings)
+			luaL_error(L, "nbm_lua accessed before onClientReady");
+
+		return m;
 	}
 
 	static int l_panic(lua_State *L)
@@ -174,55 +216,37 @@ public:
 		return 0;
 	}
 
-	static int l_print(lua_State *L)
+	static void doLog(lua_State *L, LogLevel level, int i)
 	{
 		int nargs = lua_gettop(L);
 
 		std::ostringstream ss;
-		for (int i = 0; i < nargs; ++i) {
+		for (; i < nargs; ++i) {
 			ss << lua_tostring(L, i + 1);
 			if (i + 1 < nargs)
 				ss << "\t";
 		}
-		LOG(ss.str());
+		LoggerAssistant(level, "Lua log") << ss.str();
+	}
+
+	static int l_print(lua_State *L)
+	{
+		doLog(L, LL_NORMAL, 0);
 		return 0;
 	}
 
 	static int l_error(lua_State *L)
 	{
-		int nargs = lua_gettop(L);
-
-		std::ostringstream ss;
-		for (int i = 0; i < nargs; ++i) {
-			ss << lua_tostring(L, i + 1);
-			if (i + 1 < nargs)
-				ss << "\t";
-		}
-		ERROR(ss.str());
+		doLog(L, LL_ERROR, 0);
 		// TODO: Report error to caller
 		lua_error(L);
 		return 0;
 	}
 
-	static int l_test(lua_State *L)
-	{
-		nbm_lua *m = getModule(L);
-		if (!m->m_settings)
-			return 0; // Client yet not ready
-
-		m->what = lua_tostring(L, 1);
-		// This causes SIGSEGV on the next syncFileContents() call. Why?
-		//m->m_settings->set("test", lua_tostring(L, 1));
-		WARN("Test success: " << m->what);
-		return 0;
-	}
-
 private:
-	std::string what;
 	Settings *m_settings = nullptr;
 	lua_State *m_lua = nullptr;
 };
-
 
 extern "C" {
 	DLL_EXPORT void *nbm_init()

@@ -14,15 +14,18 @@ register_callbacks("on_channel_leave")
 register_callbacks("on_user_join")
 register_callbacks("on_user_leave")
 register_callbacks("on_user_rename")
+register_callbacks("on_user_say")
 
 function bot.run_callbacks(name, mode, ...)
 	local cb = bot["callbacks_" .. name]
 	for _, func in ipairs(cb) do
-		local val = { func(...) }
-		if mode == 1 then
+		local val = { pcall(func, ...) }
+		if not val[1] then
+			print(name .. " callback failed: " .. val[2])
+		elseif mode == 1 then
 			-- Abort on true
-			if val[1] then
-				return
+			if val[2] then
+				return true
 			end
 		else
 			-- Execute all, no abort.
@@ -30,9 +33,17 @@ function bot.run_callbacks(name, mode, ...)
 	end
 end
 
-bot.register_on_client_ready(function(what)
-	print("Ready: " .. tostring(what))
-	test("foobar baz")
+bot.register_on_client_ready(function()
+	print("Client ready!")
 end)
 
-print("Hello world", "test")
+bot.register_on_user_join(function(c, ui)
+	print("User " .. c:get_nickname(ui) .. " joined.")
+end)
+
+bot.register_on_user_say(function(c, ui, msg)
+	if msg == "$luahello" then
+		c:say("Hello " .. c:get_nickname(ui) .. "!")
+		return true
+    end
+end)

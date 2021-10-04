@@ -1,0 +1,10 @@
+# This is for "client.type = tui" configurations
+#
+# load ../tests/test_nbm_lua.txt
+
+reload lua
+
+channel add #test
+user add FOO #test
+user say FOO #test $luahello
+user say FOO #test $$ unhandled message $$

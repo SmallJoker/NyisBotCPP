@@ -38,13 +38,11 @@ protected:
 	void sendRaw(cstr_t &what) const; // TODO: remove me
 	void addClientRequest(ClientRequest && cr);
 
-	//inline IClient *getClient() const
-	//{ return m_client; }
+	IClient *m_client = nullptr;
 
 private:
 	friend struct ModuleInternal;
 	const std::string *m_path = nullptr;
-	IClient *m_client = nullptr;
 };
 
 

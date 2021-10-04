@@ -1,5 +1,5 @@
-# This is for the --tui mode
-# ./loader --config tui
+# This is for "client.type = tui" configurations
+#
 # load ../tests/test_nbm_liar_game.txt
 
 reload liar_game yes

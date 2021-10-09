@@ -606,7 +606,8 @@ public:
 			case 'B': color_e = IC_BLUE;   break;
 			case 'Y': color_e = IC_YELLOW; break;
 		}
-		bool change_face = face_s.find('W') != std::string::npos;
+		bool change_face = face_s.find('W') != std::string::npos
+			|| g->top_card.color == IC_BLACK; // Possible on game start
 		size_t face_index = Card::findType(face_s);
 
 		if (color_e == IC_BLACK || face_index == Card::FACES_MAX) {

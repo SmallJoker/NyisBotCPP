@@ -91,7 +91,10 @@ public:
 
 		// Load environment
 		m_lua = lua_open();
-		luaL_openlibs(m_lua);
+		luaopen_base(m_lua);
+		luaopen_table(m_lua);
+		luaopen_string(m_lua);
+		luaopen_math(m_lua);
 
 		{
 			// Save this instance to retrieve in registered functions
@@ -149,6 +152,10 @@ public:
 		{
 			lua_pushstring(m_lua, "settings");
 			SettingsRef::create(m_lua, m_settings);
+			lua_settable(m_lua, -3);
+
+			lua_pushstring(m_lua, "check_bot_admin");
+			lua_pushcfunction(m_lua, l_check_bot_admin);
 			lua_settable(m_lua, -3);
 		}
 		lua_pop(m_lua, 1);
@@ -265,6 +272,18 @@ public:
 		doLog(L, LL_ERROR, 0);
 		// TODO: Report error to caller
 		lua_error(L);
+		return 0;
+	}
+
+	static int l_check_bot_admin(lua_State *L)
+	{
+		nbm_lua *m = getModule(L);
+		Channel *c = ChannelRef::checkClass(L, 1)->get();
+		UserInstance *ui = (UserInstance *)lua_touserdata(L, 2);
+		if (c->contains(ui)) {
+			lua_pushboolean(L, m->checkBotAdmin(c, ui));
+			return 1;
+		}
 		return 0;
 	}
 

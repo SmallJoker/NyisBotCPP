@@ -41,19 +41,21 @@ public:
 		ref->m_channel = c;
 	}
 
+	static ChannelRef *checkClass(lua_State *L, int index = 1)
+	{
+		ChannelRef *ref = (ChannelRef *)luaL_checkudata(L, index, m_classname);
+		if (!ref->m_network->contains(ref->m_channel))
+			luaL_error(L, "ChannelRef points to invalid channel");
+		return ref;
+	}
+
+	Channel *get() const { return m_channel; }
+
+private:
 	static int gc_object(lua_State* L)
 	{
 		// nothing to do
 		return 0;
-	}
-
-private:
-	static ChannelRef *checkClass(lua_State *L)
-	{
-		ChannelRef *ref = (ChannelRef *)luaL_checkudata(L, 1, m_classname);
-		if (!ref->m_network->contains(ref->m_channel))
-			luaL_error(L, "ChannelRef points to invalid channel");
-		return ref;
 	}
 
 	static int l_say(lua_State *L)

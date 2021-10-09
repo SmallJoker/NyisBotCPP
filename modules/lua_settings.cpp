@@ -42,19 +42,21 @@ public:
 		ref->m_settings = s;
 	}
 
+	static SettingsRef *checkClass(lua_State *L, int index = 1)
+	{
+		SettingsRef *ref = (SettingsRef *)luaL_checkudata(L, index, m_classname);
+		if (!ref->m_settings)
+			luaL_error(L, "SettingsRef accessed without valid reference");
+		return ref;
+	}
+
+	Settings *get() const { return m_settings; }
+
+private:
 	static int gc_object(lua_State* L)
 	{
 		// nothing to do
 		return 0;
-	}
-
-private:
-	static SettingsRef *checkClass(lua_State *L)
-	{
-		SettingsRef *ref = (SettingsRef *)luaL_checkudata(L, 1, m_classname);
-		if (!ref->m_settings)
-			luaL_error(L, "SettingsRef accessed without valid reference");
-		return ref;
 	}
 
 	static int l_get(lua_State *L)

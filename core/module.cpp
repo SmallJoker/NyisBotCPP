@@ -295,9 +295,13 @@ void ModuleMgr::onStep(float time)
 			to_execute.emplace_back(ui);
 	}
 	for (UserInstance *ui : to_execute) {
+		if (!((IUserOwner *)m_client->getNetwork())->contains(ui)) {
+			m_status_update_timeout.erase(ui);
+			continue;
+		}
+
 		m_lock.unlock();
 		// Trigger timeout callback
-		// WARNING: "ui" might be invalid
 		onUserStatusUpdate(ui, true);
 		m_lock.lock();
 	}

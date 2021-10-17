@@ -52,8 +52,17 @@ UserInstance *IUserOwner::addUser(cstr_t &name)
 UserInstance *IUserOwner::getUser(cstr_t &name) const
 {
 	for (UserInstance *ui : m_users) {
-		if (ui->nickname == name)
-			return ui;
+		if (ui->nickname.size() != name.size())
+			continue;
+
+		// Case-insensitive check
+		for (size_t i = 0; i < name.size(); ++i) {
+			if (tolower(ui->nickname[i]) != tolower(name[i]))
+				goto mismatch;
+		}
+		return ui;
+mismatch:
+		continue;
 	}
 	return nullptr;
 }

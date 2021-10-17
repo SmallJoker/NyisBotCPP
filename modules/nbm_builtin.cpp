@@ -6,6 +6,7 @@
 
 struct BuiltinContainer : public IContainer {
 	std::string remember_text;
+	Channel *status_update_channel = nullptr;
 };
 
 class nbm_builtin : public IModule {
@@ -34,22 +35,50 @@ public:
 
 	void onUserStatusUpdate(UserInstance *ui, bool is_timeout)
 	{
-		auto it = m_status_updates.find(ui);
-		if (it == m_status_updates.end())
+		BuiltinContainer *bc = (BuiltinContainer *)ui->get(this);
+		if (!bc)
 			return;
 
-		Channel *c = it->second;
-		m_status_updates.erase(it);
+		Channel *c = bc->status_update_channel;
+		if (getNetwork()->contains(c) && c->contains(ui)) {
+			if (is_timeout) {
+				c->notice(ui, "Auth request timed out. Bot error?");
+			} else {
+				c->notice(ui, "OK. Updated! Status: " + std::to_string(ui->account));
+			}
+		}
 
-		if (!getNetwork()->contains(c))
-			return;
-		if (!c->contains(ui))
+		bc->status_update_channel = nullptr;
+	}
+
+	void saveSettings()
+	{
+		if (!m_settings)
 			return;
 
-		if (is_timeout)
-			c->notice(ui, "Auth request timed out. Bot error?");
-		else
-			c->notice(ui, "OK. Updated! Status: " + std::to_string(ui->account));
+		for (UserInstance *ui : getNetwork()->getAllUsers()) {
+			BuiltinContainer *bc = (BuiltinContainer *)ui->get(this);
+			if (!bc)
+				continue;
+
+			if (bc->remember_text.empty())
+				m_settings->remove(ui->nickname);
+			else
+				m_settings->set(ui->nickname, bc->remember_text);
+		}
+
+		m_settings->syncFileContents(SR_WRITE);
+	}
+
+	BuiltinContainer *getContainer(UserInstance *ui)
+	{
+		BuiltinContainer *bc = (BuiltinContainer *)ui->get(this);
+		if (!bc) {
+			bc = new BuiltinContainer();
+			bc->remember_text = m_settings->get(ui->nickname);
+			ui->set(this, bc);
+		}
+		return bc;
 	}
 
 	bool onUserSay(Channel *c, UserInstance *ui, std::string &msg)
@@ -85,7 +114,8 @@ public:
 			return true;
 		}
 		if (cmd == "$updateauth") {
-			m_status_updates[ui] = c;
+			BuiltinContainer *bc = getContainer(ui);
+			bc->status_update_channel = c;
 			addClientRequest(ClientRequest {
 				.type = ClientRequest::RT_STATUS_UPDATE,
 				.status_update = ui
@@ -94,20 +124,6 @@ public:
 		}
 
 		return false;
-	}
-
-	void saveSettings()
-	{
-		if (!m_settings)
-			return;
-
-		for (UserInstance *ui : getNetwork()->getAllUsers()) {
-			BuiltinContainer *bc = (BuiltinContainer *)ui->get(this);
-			if (bc)
-				m_settings->set(ui->nickname, bc->remember_text);
-		}
-
-		m_settings->syncFileContents(SR_WRITE);
 	}
 
 	CHATCMD_FUNC(cmd_help)
@@ -119,13 +135,7 @@ public:
 	CHATCMD_FUNC(cmd_remember)
 	{
 		std::string what(strtrim(msg));
-
-		BuiltinContainer *bc = (BuiltinContainer *)ui->get(this);
-		if (!bc) {
-			bc = new BuiltinContainer();
-			bc->remember_text = m_settings->get(ui->nickname);
-			ui->set(this, bc);
-		}
+		BuiltinContainer *bc = getContainer(ui);
 
 		if (what.empty()) {
 			// Retrieve remembered text
@@ -164,7 +174,7 @@ public:
 	}
 
 private:
-	std::map<UserInstance *, Channel *> m_status_updates;
+	static const char STATUSUPDATE = '\0';
 	Settings *m_settings = nullptr;
 	ChatCommand *m_commands = nullptr;
 };

@@ -344,10 +344,8 @@ private:
 	size_t m_initial_player_count;
 };
 
-struct WaitingForAuth {
-	UserInstance *ui;
+struct WaitingForAuth : public IContainer {
 	Channel *c;
-	float timeout;
 	std::string msg;
 };
 
@@ -355,6 +353,9 @@ class nbm_superior_uno : public IModule {
 public:
 	~nbm_superior_uno()
 	{
+		for (UserInstance *ui : getNetwork()->getAllUsers())
+			ui->remove(&STATUSUPDATE);
+
 		if (m_settings)
 			m_settings->syncFileContents(SR_WRITE);
 	}
@@ -374,35 +375,6 @@ public:
 		uno.add("elo",   (ChatCommandAction)&nbm_superior_uno::cmd_elo);
 		uno.add("elotop", (ChatCommandAction)&nbm_superior_uno::cmd_elotop);
 		m_commands = &uno;
-	}
-
-	void onStep(float time)
-	{
-		if (m_waiting_for_auth.empty())
-			return;
-
-		auto &it = m_waiting_for_auth.front();
-
-		if (getNetwork()->contains(it.c) &&
-				it.c->contains(it.ui)) {
-
-			it.timeout += time;
-	
-			if (it.ui->account == UserInstance::UAS_LOGGED_IN) {
-				it.ui->remove(&it.ui->account); // Auth request pending
-				cmd_join(it.c, it.ui, it.msg);
-				m_waiting_for_auth.pop();
-				return;
-			}
-
-			if (it.timeout < 3)
-				return;
-
-			it.c->notice(it.ui, "Authentication check failed. Are you logged in?");
-			it.ui->remove(&it.ui->account); // Auth request pending
-		}
-
-		m_waiting_for_auth.pop();
 	}
 
 	inline UnoGame *getGame(Channel *c)
@@ -426,6 +398,23 @@ public:
 					tellGameStatus(c);
 			}
 		}
+	}
+
+	void onUserStatusUpdate(UserInstance *ui, bool is_timeout)
+	{
+		WaitingForAuth *wfa = (WaitingForAuth *)ui->get(&STATUSUPDATE);
+		if (!wfa)
+			return;
+
+		if (getNetwork()->contains(wfa->c) && wfa->c->contains(ui)) {
+			if (!is_timeout && ui->account == UserInstance::UAS_LOGGED_IN) {
+				cmd_join(wfa->c, ui, wfa->msg);
+			} else {
+				wfa->c->notice(ui, "Authentication check failed. Are you logged in?");
+			}
+		}
+
+		ui->remove(&STATUSUPDATE);
 	}
 
 	// Returns whether the game is still active
@@ -507,17 +496,18 @@ public:
 			if (ui->account == UserInstance::UAS_LOGGED_IN) {
 				// good
 			} else if (ui->account == UserInstance::UAS_UNKNOWN) {
+				{
+					// Auth request pending
+					WaitingForAuth *wfa = new WaitingForAuth();
+					wfa->c = c;
+					wfa->msg = msg;
+					ui->set(&STATUSUPDATE, wfa);
+				}
+
 				addClientRequest(ClientRequest {
 					.type = ClientRequest::RT_STATUS_UPDATE,
 					.status_update = ui
 				});
-				m_waiting_for_auth.push(WaitingForAuth {
-					.ui = ui,
-					.c = c,
-					.timeout = 0,
-					.msg = msg
-				});
-				ui->set(&ui->account, new IContainer()); // Auth request pending
 				onUserLeave(c, ui);
 				return;
 			} else {
@@ -764,11 +754,12 @@ public:
 	}
 
 private:
-	std::queue<WaitingForAuth> m_waiting_for_auth;
+	static const char STATUSUPDATE;
 	Settings *m_settings = nullptr;
 	ChatCommand *m_commands = nullptr;
 };
 
+const char nbm_superior_uno::STATUSUPDATE = '\0';
 
 extern "C" {
 	DLL_EXPORT void *nbm_init()

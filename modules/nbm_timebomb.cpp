@@ -89,13 +89,13 @@ public:
 			return;
 		}
 		if (tb->timer > 0) {
-			c->say(ui->nickname + ": Preparing materials for a new bomb. Please wait.");
+			c->say(ui->nickname + ": Contacting shady people to get new bomb materials. Please wait...");
 			return;
 		}
 		std::string nick(get_next_part(msg));
 		UserInstance *victim = c->getUser(nick);
 		if (!victim) {
-			c->say("Oh what a shame. Cannot find this user. I'll pick you instead.");
+			c->say("Oh what a shame. Cannot find this user. I will pick you instead.");
 			victim = ui;
 		}
 
@@ -130,7 +130,7 @@ public:
 
 		if (selected == tb->good_wire) {
 			tb->cooldown();
-			c->say(ui->nickname + ": Uh oh! You successfully disarmed the bomb.");
+			c->say(ui->nickname + ": Good job! You successfully disarmed the bomb.");
 			return;
 		}
 

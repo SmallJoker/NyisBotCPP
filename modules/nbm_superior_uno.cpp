@@ -8,6 +8,8 @@
 #include <queue>
 #include <sstream>
 
+static const char STATUSUPDATE = '\0';
+
 struct Card {
 	bool operator<(const Card &b)
 	{
@@ -296,7 +298,7 @@ public:
 				msg.append(" Elo: ").append(player->formatElo(false));
 			}
 			m_channel->say(msg);
-		} else if (!checkMode(UM_RANKED) || !ui->get(&ui->account)) {
+		} else if (!checkMode(UM_RANKED) || !ui->get(&STATUSUPDATE)) {
 			// This is a bit hacky. Check whether the account status update
 			// is still ongoing, and give no direct feedback in that case.
 			m_channel->say(ui->nickname + " left this UNO game.");
@@ -754,12 +756,9 @@ public:
 	}
 
 private:
-	static const char STATUSUPDATE;
 	Settings *m_settings = nullptr;
 	ChatCommand *m_commands = nullptr;
 };
-
-const char nbm_superior_uno::STATUSUPDATE = '\0';
 
 extern "C" {
 	DLL_EXPORT void *nbm_init()

@@ -185,8 +185,9 @@ public:
 	UnoGame(Channel *c, ChatCommand *cmd, Settings *s) :
 		m_channel(c), m_commands(cmd), m_settings(s)
 	{
-		// 0x87
-		modes = UM_RANKED | UM_UPGRADE | UM_STACK_WD4 | UM_STACK_D2;
+		// Default: 0x8F
+		modes = UM_RANKED | UM_WD4_REV | UM_UPGRADE | UM_STACK_WD4 | UM_STACK_D2;
+		// Classic mode: 0x80
 	}
 
 	~UnoGame()
@@ -205,7 +206,7 @@ public:
 		UM_STACK_D2  = 0x01, // Stack "draw +2" cards
 		UM_STACK_WD4 = 0x02, // Stack "wild draw +4" cards
 		UM_UPGRADE   = 0x04, // Place "wild draw +4" onto "draw +2"
-		UM_D_REVERSE = 0x08, // "no u!". Play "R" when "WD4" was used (reverse)
+		UM_WD4_REV   = 0x08, // "no u!". Play "R" when "WD4" was used (reverse)
 		UM_LIGRETTO  = 0x40, // Smash in cards whenever you have a matching one
 		UM_RANKED    = 0x80, // Ranked game, requires auth to join
 	};
@@ -219,7 +220,7 @@ public:
 		if (checkMode(UM_STACK_D2))  out.push_back("Stack D2");
 		if (checkMode(UM_STACK_WD4)) out.push_back("Stack WD4");
 		if (checkMode(UM_UPGRADE))   out.push_back("Upgrade D2 -> WD4");
-		if (checkMode(UM_D_REVERSE)) out.push_back("WD4 + R reverse");
+		if (checkMode(UM_WD4_REV))   out.push_back("WD4 + R reverse");
 		if (checkMode(UM_LIGRETTO))  out.push_back("Ligretto");
 		if (checkMode(UM_RANKED))    out.push_back("Ranked");
 
@@ -642,7 +643,7 @@ public:
 				ok = true;
 			else if (face_s == "R" &&
 					strcmp(g->top_card.face, "WD4") == 0 &&
-					g->checkMode(UnoGame::UM_D_REVERSE))
+					g->checkMode(UnoGame::UM_WD4_REV))
 				ok = true;
 
 			if (!ok) {

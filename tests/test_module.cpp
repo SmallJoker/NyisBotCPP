@@ -3,11 +3,11 @@
 #include "../core/container.h"
 #include "../core/logger.h"
 #include "../core/module.h"
-
+#include "../core/settings.h"
+#include "../client/client_tui.h"
 
 void test_Module_load_unload()
 {
-	// Module tests
 	ModuleMgr m(nullptr);
 
 	m.loadModules();

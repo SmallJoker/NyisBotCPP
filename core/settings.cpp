@@ -186,16 +186,14 @@ bool Settings::set(cstr_t &key, SettingType *type)
 std::vector<std::string> Settings::getKeys() const
 {
 	// Choose the appropriate members to access
-	auto *mutex = &m_lock;
-	const auto *map = &m_settings;
-	if (m_is_fork) {
-		mutex = &m_parent->m_lock;
-		map = &m_parent->m_settings;
-	}
-	MutexLock _(*mutex);
+	const Settings *obj = this;
+	while (obj->m_is_fork)
+		obj = obj->m_parent;
+
+	MutexLock _(obj->m_lock);
 
 	std::vector<std::string> keys;
-	for (const auto &it : *map) {
+	for (const auto &it : obj->m_settings) {
 		if (m_prefix && it.first.find(*m_prefix) != 0)
 			continue;
 

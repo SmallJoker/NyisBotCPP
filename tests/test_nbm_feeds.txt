@@ -1,0 +1,10 @@
+# This is for the --tui mode
+# ./loader --config tui
+# load ../tests/test_nbm_feeds.txt
+
+reload feeds
+
+channel add #test
+user add ADMIN #test
+user say ADMIN #test $feeds add test https://github.com/torvalds/linux/commits/master.atom
+user say ADMIN #test $feeds list

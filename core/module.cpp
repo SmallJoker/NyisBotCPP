@@ -39,12 +39,12 @@ struct ModuleInternal {
 
 ModuleMgr *IModule::getModuleMgr() const
 {
-	return m_client->getModuleMgr();
+	return m_client ?  m_client->getModuleMgr() : nullptr;
 }
 
 Network *IModule::getNetwork() const
 {
-	return m_client->getNetwork();
+	return m_client ? m_client->getNetwork() : nullptr;
 }
 
 void IModule::sendRaw(cstr_t &what) const

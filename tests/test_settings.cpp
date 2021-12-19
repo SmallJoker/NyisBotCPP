@@ -78,7 +78,9 @@ void test_Settings_read()
 		Settings s(filename, nullptr, "unit");
 		s.syncFileContents();
 		TEST_CHECK(s.get("key_i") == "");
-		TEST_CHECK(s.get("foobar") == "abc abc");
+		TEST_CHECK(s.get("foobar") == "abc abc")
+		auto keys = s.getKeys();
+		TEST_CHECK(keys.size() == 2);
 	}
 
 	std::remove(filename.c_str());
@@ -97,6 +99,7 @@ void test_Settings_write()
 	sr.syncFileContents();
 
 	// Fork test 1: Values must be read in
+	TEST_CHECK(sr_fork->getKeys().size() == 2);
 	TEST_CHECK(sr_fork->get("baz") == "nyan");
 
 	{

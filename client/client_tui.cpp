@@ -169,7 +169,10 @@ public:
 			cmd_channel_list(c, ui, msg);
 			return;
 		}
+
 		ui = c->addUser(nick);
+		ui->account = UserInstance::UAS_LOGGED_IN;
+
 		getModuleMgr()->onUserJoin(c, ui);
 	}
 
@@ -233,6 +236,8 @@ ClientTUI::ClientTUI(Settings *settings) :
 {
 	m_commands = new ChatCommand(nullptr);
 	m_helper = new TUIhelper(this, *m_commands);
+
+	m_settings->set("client.admin", "ADMIN");
 }
 
 ClientTUI::~ClientTUI()

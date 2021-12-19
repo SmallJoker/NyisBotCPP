@@ -358,8 +358,11 @@ class nbm_superior_uno : public IModule {
 public:
 	~nbm_superior_uno()
 	{
-		for (UserInstance *ui : getNetwork()->getAllUsers())
-			ui->remove(&STATUSUPDATE);
+		if (getNetwork()) {
+			// nullptr for unittest
+			for (UserInstance *ui : getNetwork()->getAllUsers())
+				ui->remove(&STATUSUPDATE);
+		}
 
 		if (m_settings)
 			m_settings->syncFileContents(SR_WRITE);

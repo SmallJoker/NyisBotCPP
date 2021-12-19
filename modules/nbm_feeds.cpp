@@ -51,6 +51,7 @@ public:
 			return;
 		timer -= 30 * 60;
 
+		size_t count = 0;
 		for (Channel *c : getNetwork()->getAllChannels()) {
 			Feeds *f = getFeedsOrCreate(c);
 
@@ -60,11 +61,10 @@ public:
 				const char *err = notifySingle(c, key, f);
 				if (err)
 					WARN(err);
+				count++;
 			}
-
-			f->settings->syncFileContents();
 		}
-		LOG("Feed check completed");
+		LOG("Feed check completed (" << count << " feeds)");
 	}
 
 	void onChannelLeave(Channel *c)
@@ -82,7 +82,6 @@ public:
 			f = new Feeds();
 			// Assign required settings prefix
 			f->settings = m_settings->fork(c->getSettingsName());
-			f->settings->syncFileContents(); // not necessary, but do anyway
 			c->getContainers()->set(this, f);
 		}
 		return f;
@@ -92,6 +91,8 @@ public:
 	{
 #if 1
 		cstr_t &url = f->settings->get(key);
+		if (url.empty())
+			return "Invalid request. Empty URL.";
 
 		// Download feed, analyze
 		std::unique_ptr<Connection> con(Connection::createHTTP("GET", url));
@@ -99,7 +100,7 @@ public:
 
 		std::unique_ptr<std::string> text(con->popAll());
 		if (!text) {
-			f->settings->remove(key);
+			f->last_update.erase(key);
 			return "File download failed";
 		}
 
@@ -116,13 +117,13 @@ public:
 			return "XML parser failed";
 		}
 
-		time_t last_update = time(nullptr);
-		time_t time_newest = 0;
+		time_t last_check = time(nullptr);
 		{
 			auto it = f->last_update.find(key);
 			if (it != f->last_update.end())
-				last_update = it->second;
+				last_check = it->second;
 		}
+		time_t time_newest = last_check;
 
 		auto nodes = doc.select_nodes("/feed/entry");
 		if (nodes.empty())
@@ -137,15 +138,16 @@ public:
 
 			tm timeinfo;
 			if (!strptime(date, "%FT%TZ", &timeinfo)) {
-				LOG("Invalid date: " << title << " date=" << date);
+				VERBOSE("Invalid date: " << title << " date=" << date);
 				continue; // Invalid date
 			}
 
 			time_t timestamp = mktime(&timeinfo);
-			if (timestamp <= last_update) {
-				LOG("Skip: " << title << " dtime=" << (timestamp - last_update));
+			if (timestamp <= last_check)
 				continue; // Skip old information
-			}
+
+			if (timestamp > time_newest)
+				time_newest = timestamp;
 
 			if (msg_limit-- == 0) {
 				LOG("Limit reached!");
@@ -159,8 +161,6 @@ public:
 			out.append(": ").append(colorize_string(title, IC_LIGHT_GRAY)); // : title
 			c->say(out);
 
-			if (timestamp > time_newest)
-				time_newest = timestamp;
 		}
 		f->last_update[key] = time_newest;
 
@@ -211,9 +211,10 @@ public:
 		if (err) {
 			c->say("Feed test failed: " + std::string(err));
 			f->settings->remove(key);
-			return;
+		} else {
+			c->reply(ui, "Added!");
 		}
-		c->say(ui->nickname + ": Added!");
+		f->settings->syncFileContents(SR_WRITE);
 	}
 
 	CHATCMD_FUNC(cmd_remove)
@@ -229,6 +230,7 @@ public:
 		} else {
 			c->say("Key not found");
 		}
+		f->settings->syncFileContents(SR_WRITE);
 	}
 
 private:

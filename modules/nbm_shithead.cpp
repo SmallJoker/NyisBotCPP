@@ -18,14 +18,23 @@ struct SCard {
 	static std::string format(const std::vector<const SCard *> &cards)
 	{
 		std::ostringstream ss;
+		ss << " ";
 		for (auto c : cards) {
 			ss << "[" << c->face;
 			if (c->short_desc)
 				ss << " " << c->short_desc;
-			ss << "]";
+			ss << "] ";
 		}
 		return ss.str();
 	}
+
+	enum CardAction {
+		CA_NONE,
+		CA_2_RESET,
+		CA_4_WILD,
+		CA_7_LOWER,
+		CA_10_DONE,
+	} action;
 
 	const char *face;
 	const char *short_desc;
@@ -34,20 +43,21 @@ struct SCard {
 	static const SCard TYPES[];
 };
 
+// In sync with CardType
 const SCard SCard::TYPES[] = {
-	{"2",  "(0)", "Reset to 0. Any card may be played."},
-	{"3",  NULL,  "Initial game starting card."},
-	{"4",  "(*)", "Wildcard: Preserves the previous number"},
-	{"5",  NULL,  NULL},
-	{"6",  NULL,  NULL},
-	{"7",  "(v)", "The next played card must be lower than 7."},
-	{"8",  NULL,  NULL},
-	{"9",  NULL,  NULL},
-	{"10", "(X)", "Wildcard: Terminates the stack."},
-	{"J",  NULL,  NULL},
-	{"Q",  NULL,  NULL},
-	{"K",  NULL,  NULL},
-	{"A",  NULL,  NULL},
+	{CA_2_RESET, "2",  "⁰", "Reset to 0. Any card may be played."},
+	{CA_NONE,    "3",  NULL,  NULL},
+	{CA_4_WILD,  "4",  "*", "Wildcard: Preserves the previous number"},
+	{CA_NONE,    "5",  NULL,  NULL},
+	{CA_NONE,    "6",  NULL,  NULL},
+	{CA_7_LOWER, "7",  "v", "The next played card must be lower than 7."},
+	{CA_NONE,    "8",  NULL,  NULL},
+	{CA_NONE,    "9",  NULL,  NULL},
+	{CA_10_DONE, "10", "x", "Wildcard: Terminates the stack."},
+	{CA_NONE,    "J",  NULL,  NULL},
+	{CA_NONE,    "Q",  NULL,  NULL},
+	{CA_NONE,    "K",  NULL,  NULL},
+	{CA_NONE,    "A",  NULL,  NULL},
 };
 
 struct SPlayer : public IContainer {
@@ -56,7 +66,7 @@ struct SPlayer : public IContainer {
 	std::vector<const SCard *> cards;
 
 	// Minimal count of cards in the player's hand if the stack is non-empty
-	static const size_t MIN_IN_HAND = 3;
+	static const size_t MIN_IN_HAND = 5;
 };
 
 class SGame : public IContainer {
@@ -98,6 +108,9 @@ public:
 		if (!p)
 			return;
 
+		if (has_started && p->cards.size() == 0)
+			m_channel->say(ui->nickname + " finished the game. gg!");
+
 		m_commands->resetScope(m_channel, ui);
 		ui->remove(this);
 		m_players.erase(ui);
@@ -135,7 +148,7 @@ public:
 		draw_stack.reserve(sizeof(SCard::TYPES) / sizeof(SCard) * SGame::NUM_PER_FACE);
 
 		for (const SCard &type : SCard::TYPES) {
-			for (int i = 0; i < SGame::NUM_PER_FACE; ++i)
+			for (size_t i = 0; i < SGame::NUM_PER_FACE; ++i)
 				draw_stack.emplace_back(&type);
 		}
 
@@ -164,8 +177,8 @@ public:
 		return true;
 	}
 
-	static const size_t MIN_PLAYERS = 3;
-	static const size_t NUM_PER_FACE = 4;
+	static const size_t MIN_PLAYERS = 2;//3;
+	static const size_t NUM_PER_FACE = 5;
 
 	bool has_started = false;
 	UserInstance *current = nullptr;
@@ -187,8 +200,11 @@ public:
 		uno.setMain((ChatCommandAction)&nbm_shithead::cmd_help);
 		uno.add("join",  (ChatCommandAction)&nbm_shithead::cmd_join);
 		uno.add("leave", (ChatCommandAction)&nbm_shithead::cmd_leave);
+		uno.add("deal",  (ChatCommandAction)&nbm_shithead::cmd_deal);
+		uno.add("top",   (ChatCommandAction)&nbm_shithead::cmd_top);
 		uno.add("p",     (ChatCommandAction)&nbm_shithead::cmd_play);
 		uno.add("d",     (ChatCommandAction)&nbm_shithead::cmd_draw);
+		uno.add("t",     (ChatCommandAction)&nbm_shithead::cmd_take_stack);
 		m_commands = &uno;
 	}
 
@@ -250,10 +266,14 @@ public:
 
 		std::ostringstream ss;
 		ss << "[Shithead] " << g->current->nickname << " (" << p->cards.size() << " cards) - ";
-		ss << "Top card: [" << g->play_stack.back() << "]";
-		ss << " - Size: "<< g->play_stack.size();
+		if (g->play_stack.empty()) {
+			ss << "Empty stack (start with any low number)";
+		} else {
+			ss << "Top card:\x02" << SCard::format({ g->play_stack.back() }) << "\x0F"; // Bold, then normal.
+			ss << "Size: "<< g->play_stack.size();
+		}
 		if (!g->draw_stack.empty())
-			ss << " (Draw stack: "<< g->play_stack.size() << ")";
+			ss << " - (Draw stack: "<< g->draw_stack.size() << ")";
 
 		c->say(ss.str());
 
@@ -337,12 +357,12 @@ public:
 			c->notice(ui, "There is no game to start.");
 			return;
 		}
-
 		if (!g->start()) {
 			c->say("Game start failed. Either there are not enough players, "
 				"or the game is already ongoing.");
 			return;
 		}
+
 		tellGameStatus(c);
 	}
 
@@ -357,28 +377,38 @@ public:
 		tellGameStatus(c, ui);
 	}
 
-	CHATCMD_FUNC(cmd_play)
+	bool checkActionValid(Channel *c, UserInstance *ui)
 	{
 		SGame *g = getGame(c);
 		SPlayer *p = g ? g->getPlayer(ui) : nullptr;
 		if (!p || !g->has_started) {
-			c->notice(ui, "huh?? You don't have any cards.");
-			return;
+			c->notice(ui, "You are not part of an ongoing game.");
+			return false;
 		}
 
 		if (g->current != ui) {
 			c->notice(ui, "It is not your turn (current: " + g->current->nickname + ").");
-			return;
+			return false;
 		}
+		return true;
+	}
+
+	CHATCMD_FUNC(cmd_play)
+	{
+		if (!checkActionValid(c, ui))
+			return;
+		SGame *g = getGame(c);
+		SPlayer *p = g->getPlayer(ui);
 
 		const SCard *played_card = nullptr;
 		long played_count = 1;
+		// Get card type and count
 		{
 			std::string card_s(get_next_part(msg));
 			std::string count_s(get_next_part(msg));
 
 			for (char &c : card_s)
-				c = toupper(c);
+				c = toupper(c); // J Q K A
 
 			for (auto &type : SCard::TYPES) {
 				if (type.face == card_s) {
@@ -387,7 +417,8 @@ public:
 				}
 			}
 
-			SettingType::parseLong(count_s, &played_count);
+			if (!count_s.empty())
+				SettingType::parseLong(count_s, &played_count);
 		}
 
 		if (!played_card) {
@@ -395,9 +426,45 @@ public:
 			return;
 		}
 
-		// TODO: CHeck whether this card may be played.
+		// Start condition check
+		const SCard *top = SCard::TYPES;
 
-		size_t have_num = std::count_if(p->cards.begin(), p->cards.end(), [=] (const SCard *a) -> bool {
+		// Walk backwards until a non-4 is found
+		for (auto it = g->play_stack.rbegin(); it != g->play_stack.rend(); ++it) {
+			if ((*it)->action != SCard::CA_4_WILD) {
+				top = *it;
+				break;
+			}
+		}
+
+		// Check whether the card may be played
+		bool ok = false;
+		switch (played_card->action) {
+			case SCard::CA_2_RESET:
+			case SCard::CA_4_WILD:
+			case SCard::CA_10_DONE:
+				ok = true;
+				break;
+			default:
+				// Pointer comparison
+				if (top->action != SCard::CA_7_LOWER) {
+					// Normal case
+					ok = played_card >= top;
+				} else {
+					// Must be lower
+					ok = played_card < top;
+				}
+				break;
+		}
+
+		if (!ok) {
+			c->notice(ui, "This card cannot played. Generally play higher cards, "
+				"or lower only if a [7] was played last.");
+			return;
+		}
+
+		// Count cards in hand to play
+		long have_num = std::count_if(p->cards.begin(), p->cards.end(), [=] (const SCard *a) -> bool {
 			return a == played_card;
 		});
 
@@ -406,49 +473,100 @@ public:
 			return;
 		}
 
-		std::remove_if(p->cards.begin(), p->cards.end(), [&] (const SCard *a) -> bool {
-			if (a == played_card && played_count > 0) {
+		// Remove cards from hand, add to play stack
+		for (auto it = p->cards.begin(); it != p->cards.end();){
+			if (*it == played_card && played_count > 0) {
+				g->play_stack.push_back(*it);
 				played_count--;
-				return true;
+
+				it = p->cards.erase(it);
+				continue;
 			}
-			return false;
-		});
+			it++;
+		}
+
+
+		// Do card action
+		if (played_card->action == SCard::CA_10_DONE)
+			g->play_stack.clear();
 
 
 		// Refill cards in hand
-		bool new_cards = false;
-		while (!g->draw_stack.empty() && p->cards.size() < SPlayer::MIN_IN_HAND) {
-			p->cards.push_back(g->draw_stack.back());
-			g->draw_stack.pop_back();
-			new_cards = true;
+		{
+			std::vector<const SCard *> drawn;
+			for (size_t i = p->cards.size(); i < SPlayer::MIN_IN_HAND; ++i) {
+				if (g->draw_stack.empty())
+					break;
+				drawn.push_back(g->draw_stack.back());
+				g->draw_stack.pop_back();
+			}
+
+			if (!drawn.empty()) {
+				c->notice(ui, "You drew the following cards: " + SCard::format(drawn));
+				p->cards.insert(p->cards.end(), drawn.begin(), drawn.end());
+				std::sort(p->cards.begin(), p->cards.end());
+			}
 		}
-		if (new_cards)
-			std::sort(p->cards.begin(), p->cards.end());
+
+		g->turnNext();
+
+		// Player won, except when it's again their turn (last card = skip)
+		if (p->cards.empty() && g->current != ui)
+			g->removePlayer(ui);
+
+		if (!processGameUpdate(c))
+			return; // Game ended
 
 		tellGameStatus(c);
 	}
 
+	// Draw from the draw stack
 	CHATCMD_FUNC(cmd_draw)
 	{
+		if (!checkActionValid(c, ui))
+			return;
 		SGame *g = getGame(c);
-		SPlayer *p = g ? g->getPlayer(ui) : nullptr;
-		if (!p || !g->has_started) {
-			c->notice(ui, "You are not part of an ongoing game.");
+		SPlayer *p = g->getPlayer(ui);
+
+		if (g->draw_stack.empty()) {
+			c->notice(ui, "There is no draw stack to draw from. "
+				"Use the 't' subcommand to draw the entire played stack.");
 			return;
 		}
 
-		if (g->current != ui) {
-			c->notice(ui, "It is not your turn (current: " + g->current->nickname + ").");
+		// Draw from draw stack
+		p->cards.push_back(g->draw_stack.back());
+		g->draw_stack.pop_back();
+		c->notice(ui, "You drew the following card: " + SCard::format({ p->cards.back() }));
+
+		std::sort(p->cards.begin(), p->cards.end());
+
+		g->turnNext();
+		tellGameStatus(c);
+	}
+
+	// Draw the entire played stack
+	CHATCMD_FUNC(cmd_take_stack)
+	{
+		if (!checkActionValid(c, ui))
+			return;
+		SGame *g = getGame(c);
+		SPlayer *p = g->getPlayer(ui);
+
+		if (g->play_stack.empty()) {
+			c->notice(ui, "Start a new stack using any card.");
 			return;
 		}
 
-		if (!g->draw_stack.empty()) {
-			// Draw from stack
-		} else {
-			// Draw the played stack
-			p->cards.insert(p->cards.end(), g->play_stack.begin(), g->play_stack.end());
-			std::sort(p->cards.begin(), p->cards.end());
-		}
+		// Draw the play stack
+		p->cards.insert(p->cards.end(), g->play_stack.begin(), g->play_stack.end());
+		std::sort(p->cards.begin(), p->cards.end());
+
+		c->notice(ui, "You drew the following cards: " + SCard::format(g->play_stack));
+		g->play_stack.clear();
+
+		g->turnNext();
+		tellGameStatus(c);
 	}
 
 private:

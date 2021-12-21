@@ -1,3 +1,5 @@
+#include "../core/framework_game.h"
+
 #include "../core/channel.h"
 #include "../core/chatcommand.h"
 #include "../core/module.h"
@@ -69,79 +71,33 @@ struct SPlayer : public IContainer {
 	static const size_t MIN_IN_HAND = 5;
 };
 
-class SGame : public IContainer {
+class SGame : public IContainer, public GameF_internal<SPlayer> {
 public:
 	std::string dump() const { return "SGame"; }
 
 	SGame(Channel *c, ChatCommand *cmd) :
-		m_channel(c), m_commands(cmd) {}
+		GameF_internal<SPlayer>(c, cmd, 2) {}
 
 	~SGame()
 	{
-		for (UserInstance *ui : m_players) {
-			m_commands->resetScope(m_channel, ui);
-			ui->remove(this);
-		}
+		// Cleanup done by framework
 	}
 
-	inline SPlayer *getPlayer(UserInstance *ui)
-	{
-		return (SPlayer *)ui->get(this);
-	}
-
-	bool addPlayer(UserInstance *ui)
-	{
-		if (has_started || getPlayer(ui))
-			return false;
-
-		m_commands->setScope(m_channel, ui);
-
-		SPlayer *p = new SPlayer();
-		ui->set(this, p);
-		m_players.insert(ui);
-		return true;
-	}
-
-	void removePlayer(UserInstance *ui)
+	bool removePlayer(UserInstance *ui)
 	{
 		SPlayer *p = getPlayer(ui);
 		if (!p)
-			return;
+			return false;
 
 		if (has_started && p->cards.size() == 0)
 			m_channel->say(ui->nickname + " finished the game. gg!");
 
-		m_commands->resetScope(m_channel, ui);
-		ui->remove(this);
-		m_players.erase(ui);
-
-		if (ui == current)
-			turnNext();
+		return GameF_internal::removePlayer(ui);
 	}
-
-	void turnNext()
-	{
-		if (m_players.size() == 0) {
-			current = nullptr;
-			return;
-		}
-
-		auto it = m_players.find(current);
-		if (++it == m_players.end())
-			it = m_players.begin();
-
-		current = *it;
-	}
-
-	const std::set<UserInstance *> &getAllPlayers() const
-	{ return m_players; }
-
-	size_t getPlayerCount() const
-	{ return m_players.size(); }
 
 	bool start()
 	{
-		if (m_players.size() < SGame::MIN_PLAYERS || has_started)
+		if (!GameF_internal::start())
 			return false;
 
 		// List of all cards in the game
@@ -171,28 +127,17 @@ public:
 		}
 		draw_stack.erase(c_it, draw_stack.end());
 
-		// Mark game as started
-		has_started = true;
-		current = *m_players.begin();
 		return true;
 	}
 
-	static const size_t MIN_PLAYERS = 2;//3;
 	static const size_t NUM_PER_FACE = 5;
 
-	bool has_started = false;
-	UserInstance *current = nullptr;
 	std::vector<const SCard *> draw_stack;
 	std::vector<const SCard *> play_stack;
-
-private:
-	std::set<UserInstance *> m_players;
-	Channel *m_channel;
-	ChatCommand *m_commands;
 };
 
 
-class nbm_shithead : public IModule {
+class nbm_shithead : public GameF_nbm<SGame, SPlayer> {
 public:
 	void onClientReady()
 	{
@@ -208,11 +153,6 @@ public:
 		m_commands = &uno;
 	}
 
-	inline SGame *getGame(Channel *c)
-	{
-		return (SGame *)c->getContainers()->get(this);
-	}
-
 	void onChannelLeave(Channel *c)
 	{
 		c->getContainers()->remove(this);
@@ -220,15 +160,7 @@ public:
 
 	void onUserLeave(Channel *c, UserInstance *ui)
 	{
-		if (SGame *g = getGame(c)) {
-			UserInstance *old_current = g->current;
-			g->removePlayer(ui);
-
-			if (processGameUpdate(c)) {
-				if (old_current != g->current)
-					tellGameStatus(c);
-			}
-		}
+		GameF_onUserLeave(c, ui);
 	}
 
 	// Returns whether the game is still active
@@ -238,7 +170,7 @@ public:
 		if (!g)
 			return false;
 
-		if (g->getPlayerCount() >= SGame::MIN_PLAYERS)
+		if (g->getPlayerCount() >= g->MIN_PLAYERS)
 			return true;
 
 		if (g->has_started) {
@@ -330,14 +262,13 @@ public:
 		std::ostringstream ss;
 		ss << "[Shithead] " << g->getPlayerCount();
 		ss << " player(s) are waiting for a new Shithead game. ";
-		if (g->getPlayerCount() < SGame::MIN_PLAYERS)
-			ss << "Miniaml player count: " << SGame::MIN_PLAYERS;
+		if (g->getPlayerCount() < g->MIN_PLAYERS)
+			ss << "Miniaml player count: " << g->MIN_PLAYERS;
 		else
 			ss << "You may start it now.";
 		c->say(ss.str());
 	}
 
-	// TODO: Move those functions into a parent/helper class
 	CHATCMD_FUNC(cmd_leave)
 	{
 		SGame *g = getGame(c);
@@ -377,25 +308,9 @@ public:
 		tellGameStatus(c, ui);
 	}
 
-	bool checkActionValid(Channel *c, UserInstance *ui)
-	{
-		SGame *g = getGame(c);
-		SPlayer *p = g ? g->getPlayer(ui) : nullptr;
-		if (!p || !g->has_started) {
-			c->notice(ui, "You are not part of an ongoing game.");
-			return false;
-		}
-
-		if (g->current != ui) {
-			c->notice(ui, "It is not your turn (current: " + g->current->nickname + ").");
-			return false;
-		}
-		return true;
-	}
-
 	CHATCMD_FUNC(cmd_play)
 	{
-		if (!checkActionValid(c, ui))
+		if (!checkPlayerTurn(c, ui))
 			return;
 		SGame *g = getGame(c);
 		SPlayer *p = g->getPlayer(ui);
@@ -523,7 +438,7 @@ public:
 	// Draw from the draw stack
 	CHATCMD_FUNC(cmd_draw)
 	{
-		if (!checkActionValid(c, ui))
+		if (!checkPlayerTurn(c, ui))
 			return;
 		SGame *g = getGame(c);
 		SPlayer *p = g->getPlayer(ui);
@@ -548,7 +463,7 @@ public:
 	// Draw the entire played stack
 	CHATCMD_FUNC(cmd_take_stack)
 	{
-		if (!checkActionValid(c, ui))
+		if (!checkPlayerTurn(c, ui))
 			return;
 		SGame *g = getGame(c);
 		SPlayer *p = g->getPlayer(ui);

@@ -4,6 +4,10 @@
 #include "../core/chatcommand.h"
 #include "../core/module.h"
 
+/*
+	This is a base class for turn-based games.
+*/
+
 template <typename PlayerT>
 class GameF_internal {
 public:

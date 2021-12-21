@@ -3,7 +3,6 @@
 #include "../core/channel.h"
 #include "../core/chatcommand.h"
 #include "../core/module.h"
-#include "../core/logger.h"
 #include "../core/settings.h"
 #include "../core/utils.h"
 #include <algorithm> // std::sort
@@ -191,12 +190,10 @@ public:
 		// Default: 0x8F
 		modes = UM_RANKED | UM_WD4_REV | UM_UPGRADE | UM_STACK_WD4 | UM_STACK_D2;
 		// Classic mode: 0x80
-			LOG("create game");
 	}
 
 	~UnoGame()
 	{
-			LOG("delete game");
 		if (m_settings)
 			m_settings->syncFileContents(SR_WRITE);
 	}
@@ -269,8 +266,7 @@ public:
 			m_channel->say(ui->nickname + " left this UNO game.");
 		}
 
-		GameF_internal::removePlayer(ui);
-		return true;
+		return GameF_internal::removePlayer(ui);
 	}
 
 	bool start()
@@ -420,7 +416,6 @@ public:
 		if (!g) {
 			g = new UnoGame(c, m_commands, m_settings);
 			c->getContainers()->set(this, g);
-			LOG("Create new");
 		}
 
 		if (!g->addPlayer(ui)) {

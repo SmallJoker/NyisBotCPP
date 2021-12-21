@@ -1,3 +1,5 @@
+#include "../core/framework_game.h"
+
 #include "../core/channel.h"
 #include "../core/chatcommand.h"
 #include "../core/module.h"
@@ -54,52 +56,12 @@ const char *LPlayer::FACES[] = {
 };
 
 // Per-channel
-class LGame : public IContainer {
+class LGame : public IContainer, public GameF_internal<LPlayer> {
 public:
 	std::string dump() const { return "LGame"; }
 
 	LGame(Channel *c, ChatCommand *cmd) :
-		m_channel(c), m_commands(cmd) {}
-
-	~LGame()
-	{
-		for (UserInstance *ui : m_players) {
-			m_commands->resetScope(m_channel, ui);
-			ui->remove(this);
-		}
-	}
-
-	inline LPlayer *getPlayer(UserInstance *ui)
-	{
-		return (LPlayer *)ui->get(this);
-	}
-
-	bool addPlayer(UserInstance *ui)
-	{
-		if (has_started || getPlayer(ui))
-			return false;
-
-		m_commands->setScope(m_channel, ui);
-
-		LPlayer *p = new LPlayer();
-		ui->set(this, p);
-		m_players.insert(ui);
-		return true;
-	}
-
-	void removePlayer(UserInstance *ui)
-	{
-		LPlayer *p = getPlayer(ui);
-		if (!p)
-			return;
-
-		m_commands->resetScope(m_channel, ui);
-		ui->remove(this);
-		m_players.erase(ui);
-
-		if (ui == current)
-			turnNext();
-	}
+		GameF_internal(c, cmd, 3) {}
 
 	UserInstance *getPrevPlayer()
 	{
@@ -113,26 +75,12 @@ public:
 		return *it;
 	}
 
-	void turnNext()
-	{
-		if (m_players.size() == 0) {
-			current = nullptr;
-			return;
-		}
-
-		auto it = m_players.find(current);
-		if (++it == m_players.end())
-			it = m_players.begin();
-
-		current = *it;
-	}
-
 	const std::set<UserInstance *> &getAllPlayers() const
 	{ return m_players; }
 
 	bool start()
 	{
-		if (m_players.size() < LGame::MIN_PLAYERS || has_started)
+		if (!GameF_internal::start())
 			return false;
 
 		// List of all cards in the game
@@ -159,28 +107,16 @@ public:
 			c_it++;
 		}
 
-		has_started = true;
-		current = *m_players.begin();
 		return true;
 	}
 
-	static const size_t MIN_PLAYERS = 3;
-
-	bool has_started = false;
-	UserInstance *current = nullptr;
 	std::vector<const char *> stack;
 	const char *main_face = nullptr;
 	size_t stack_last = 0;
-
-private:
-	std::set<UserInstance *> m_players;
-	Channel *m_channel;
-	ChatCommand *m_commands;
 };
 
-class nbm_liar_game : public IModule {
+class nbm_liar_game : public GameF_nbm<LGame, LPlayer> {
 public:
-
 	void onClientReady()
 	{
 		ChatCommand &lcmd = getModuleMgr()->getChatCommand()->add("$lgame", this);
@@ -194,21 +130,9 @@ public:
 		m_commands = &lcmd;
 	}
 
-	inline LGame *getGame(Channel *c)
-	{
-		return (LGame *)c->getContainers()->get(this);
-	}
-
 	void onUserLeave(Channel *c, UserInstance *ui)
 	{
-		LGame *g = getGame(c);
-		if (!g || !g->getPlayer(ui))
-			return;
-
-		g->removePlayer(ui);
-		if (processGameUpdate(c)) {
-			tellGameStatus(c);
-		}
+		GameF_onUserLeave(c, ui);
 	}
 
 	void onChannelLeave(Channel *c)
@@ -216,25 +140,28 @@ public:
 		c->getContainers()->remove(this);
 	}
 
-	void tellGameStatus(Channel *c)
+	void tellGameStatus(Channel *c, UserInstance *to_user = nullptr)
 	{
 		LGame *g = getGame(c);
 		if (!g->has_started || g->stack.empty())
 			return;
 
-		UserInstance *ui = g->current;
-		if (!ui)
-			return;
+		if (!g->current)
+			return; // Should not happen
+
+		// No specific player. Take current one
+		if (to_user == nullptr)
+			to_user = g->current;
 
 		// Normal ongoing game
 		std::ostringstream ss;
 
 		ss << "[LGame] Main card: " << LPlayer::format({ g->main_face });
 		ss << ", Stack height: " << g->stack.size();
-		ss << ". Current player: " << ui->nickname;
+		ss << ". Current player: " << g->current->nickname;
 
 		c->say(ss.str());
-		c->notice(ui, LPlayer::format(g->getPlayer(ui)->cards, true));
+		c->notice(to_user, LPlayer::format(g->getPlayer(to_user)->cards, true));
 	}
 
 	// Returns true if the player finished
@@ -290,7 +217,7 @@ public:
 			return false;
 		}
 
-		if (amount <= LGame::MIN_PLAYERS && ui == g->current) {
+		if (amount <= g->MIN_PLAYERS && ui == g->current) {
 			c->say(ui->nickname + " has " +
 				colorize_string("only " + std::to_string(amount) + " cards", IC_ORANGE) + " left!");
 		}
@@ -302,7 +229,7 @@ public:
 		LGame *g = getGame(c);
 		if (!g)
 			return false;
-		if (g->getAllPlayers().size() >= LGame::MIN_PLAYERS)
+		if (g->getAllPlayers().size() >= g->MIN_PLAYERS)
 			return true;
 
 		if (g->has_started) {
@@ -342,10 +269,10 @@ public:
 		size_t count = g->getAllPlayers().size();
 		std::ostringstream ss;
 		ss << "Player " << ui->nickname << " joined the game. Total " << count << " players ready.";
-		if (count >= LGame::MIN_PLAYERS)
+		if (count >= g->MIN_PLAYERS)
 			ss << " If you want to start the game, use \"$start\"";
 		else if (count == 1)
-			ss << " At least " << LGame::MIN_PLAYERS << " players are required to start the game.";
+			ss << " At least " << g->MIN_PLAYERS << " players are required to start the game.";
 
 		c->say(ss.str());
 	}
@@ -373,7 +300,7 @@ public:
 
 		if (!g->start()) {
 			c->say("[LGame] Game start failed. There must be at least "
-				+ std::to_string(LGame::MIN_PLAYERS) + " players waiting.");
+				+ std::to_string(g->MIN_PLAYERS) + " players waiting.");
 			return;
 		}
 
@@ -390,17 +317,10 @@ public:
 
 	CHATCMD_FUNC(cmd_add)
 	{
+		if (!checkPlayerTurn(c, ui))
+			return;
 		LGame *g = getGame(c);
-		LPlayer *p = g ? g->getPlayer(ui) : nullptr;
-		if (!p || !g->has_started) {
-			c->notice(ui, "You are not part of an ongoing game");
-			return;
-		}
-
-		if (ui != g->current) {
-			c->notice(ui, "It is yet not your turn. Current: " + g->current->nickname);
-			return;
-		}
+		LPlayer *p = g->getPlayer(ui);
 
 		std::string face(get_next_part(msg));
 		for (char &c : face)
@@ -480,17 +400,10 @@ public:
 
 	CHATCMD_FUNC(cmd_check)
 	{
+		if (!checkPlayerTurn(c, ui))
+			return;
 		LGame *g = getGame(c);
-		LPlayer *p = g ? g->getPlayer(ui) : nullptr;
-		if (!p || !g->has_started) {
-			c->notice(ui, "You are not part of an ongoing game");
-			return;
-		}
-
-		if (ui != g->current) {
-			c->notice(ui, "It is yet not your turn. Current: " + g->current->nickname);
-			return;
-		}
+		LPlayer *p = g->getPlayer(ui);
 
 		if (g->stack.empty()) {
 			c->notice(ui, "There is no stack to check. Please start a new one.");

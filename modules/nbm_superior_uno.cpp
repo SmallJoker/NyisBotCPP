@@ -1,6 +1,9 @@
+#include "../core/framework_game.h"
+
 #include "../core/channel.h"
 #include "../core/chatcommand.h"
 #include "../core/module.h"
+#include "../core/logger.h"
 #include "../core/settings.h"
 #include "../core/utils.h"
 #include <algorithm> // std::sort
@@ -178,25 +181,22 @@ private:
 		m_delta = 0;
 };
 
-class UnoGame : public IContainer {
+class UnoGame : public IContainer, public GameF_internal<UnoPlayer> {
 public:
 	std::string dump() const { return "UnoGame"; }
 
 	UnoGame(Channel *c, ChatCommand *cmd, Settings *s) :
-		m_channel(c), m_commands(cmd), m_settings(s)
+		GameF_internal(c, cmd, 2), m_settings(s)
 	{
 		// Default: 0x8F
 		modes = UM_RANKED | UM_WD4_REV | UM_UPGRADE | UM_STACK_WD4 | UM_STACK_D2;
 		// Classic mode: 0x80
+			LOG("create game");
 	}
 
 	~UnoGame()
 	{
-		for (UserInstance *ui : m_players) {
-			m_commands->resetScope(m_channel, ui);
-			ui->remove(this);
-		}
-
+			LOG("delete game");
 		if (m_settings)
 			m_settings->syncFileContents(SR_WRITE);
 	}
@@ -207,7 +207,6 @@ public:
 		UM_STACK_WD4 = 0x02, // Stack "wild draw +4" cards
 		UM_UPGRADE   = 0x04, // Place "wild draw +4" onto "draw +2"
 		UM_WD4_REV   = 0x08, // "no u!". Play "R" when "WD4" was used (reverse)
-		UM_LIGRETTO  = 0x40, // Smash in cards whenever you have a matching one
 		UM_RANKED    = 0x80, // Ranked game, requires auth to join
 	};
 
@@ -221,7 +220,6 @@ public:
 		if (checkMode(UM_STACK_WD4)) out.push_back("Stack WD4");
 		if (checkMode(UM_UPGRADE))   out.push_back("Upgrade D2 -> WD4");
 		if (checkMode(UM_WD4_REV))   out.push_back("WD4 + R reverse");
-		if (checkMode(UM_LIGRETTO))  out.push_back("Ligretto");
 		if (checkMode(UM_RANKED))    out.push_back("Ranked");
 
 		std::string strout;
@@ -233,56 +231,20 @@ public:
 		return strout;
 	}
 
-	void turnNext()
-	{
-		if (m_players.size() == 0) {
-			current = nullptr;
-			return;
-		}
-
-		auto it = m_players.find(current);
-		if (dir_forwards) {
-			if (++it == m_players.end())
-				it = m_players.begin();
-		} else {
-			if (it == m_players.begin())
-				it = m_players.end();
-			it--;
-		}
-		current = *it;
-	}
-
 	bool addPlayer(UserInstance *ui)
 	{
-		if (has_started)
+		if (!GameF_internal::addPlayer(ui))
 			return false;
 
-		if (getPlayer(ui))
-			return false;
-
-		m_commands->setScope(m_channel, ui);
-
-		UnoPlayer *p = new UnoPlayer();
-		ui->set(this, p);
-		m_settings->get(ui->nickname, p);
-
-		m_players.insert(ui);
+		m_settings->get(ui->nickname, getPlayer(ui));
 		return true;
 	}
 
-	inline UnoPlayer *getPlayer(UserInstance *ui)
-	{
-		return (UnoPlayer *)ui->get(this);
-	}
-
-	void removePlayer(UserInstance *ui)
+	bool removePlayer(UserInstance *ui)
 	{
 		UnoPlayer *player = getPlayer(ui);
 		if (!player)
-			return;
-
-		if (ui == current)
-			turnNext();
+			return false;
 
 		if (has_started && player->cards.size() == 0) {
 			std::string msg;
@@ -307,45 +269,30 @@ public:
 			m_channel->say(ui->nickname + " left this UNO game.");
 		}
 
-		m_commands->resetScope(m_channel, ui);
-		ui->remove(this);
-		m_players.erase(ui);
+		GameF_internal::removePlayer(ui);
+		return true;
 	}
-
-	size_t getPlayerCount() const
-	{ return m_players.size(); }
 
 	bool start()
 	{
-		if (m_players.size() < UnoPlayer::MIN_PLAYERS || has_started)
+		if (!GameF_internal::start())
 			return false;
 
 		for (UserInstance *ui : m_players)
 			getPlayer(ui)->drawCards(11, 2);
-	
-		has_started = true;
+
 		m_initial_player_count = m_players.size();
-		current = *m_players.begin();
 		UnoPlayer *p = getPlayer(current);
 		top_card = p->cards[get_random() % p->cards.size()];
-
-		turnNext();
 		return true;
 	}
 
-	bool has_started = false;
-	UserInstance *current = nullptr;
 	Card top_card;
 	int draw_count = 0;
-	bool dir_forwards = true;
 	uint8_t modes;
 
 private:
-	Channel *m_channel;
-	ChatCommand *m_commands;
 	Settings *m_settings;
-	std::set<UserInstance *> m_players;
-
 	size_t m_initial_player_count;
 };
 
@@ -354,7 +301,7 @@ struct WaitingForAuth : public IContainer {
 	std::string msg;
 };
 
-class nbm_superior_uno : public IModule {
+class nbm_superior_uno : public GameF_nbm<UnoGame, UnoPlayer> {
 public:
 	~nbm_superior_uno()
 	{
@@ -385,11 +332,6 @@ public:
 		m_commands = &uno;
 	}
 
-	inline UnoGame *getGame(Channel *c)
-	{
-		return (UnoGame *)c->getContainers()->get(this);
-	}
-
 	void onChannelLeave(Channel *c)
 	{
 		c->getContainers()->remove(this);
@@ -397,15 +339,7 @@ public:
 
 	void onUserLeave(Channel *c, UserInstance *ui)
 	{
-		if (UnoGame *g = getGame(c)) {
-			UserInstance *old_current = g->current;
-			g->removePlayer(ui);
-
-			if (processGameUpdate(c)) {
-				if (old_current != g->current)
-					tellGameStatus(c);
-			}
-		}
+		GameF_onUserLeave(c, ui);
 	}
 
 	void onUserStatusUpdate(UserInstance *ui, bool is_timeout)
@@ -486,6 +420,7 @@ public:
 		if (!g) {
 			g = new UnoGame(c, m_commands, m_settings);
 			c->getContainers()->set(this, g);
+			LOG("Create new");
 		}
 
 		if (!g->addPlayer(ui)) {
@@ -571,19 +506,11 @@ public:
 
 	CHATCMD_FUNC(cmd_play)
 	{
+		if (!checkPlayerTurn(c, ui))
+			return;
 		UnoGame *g = getGame(c);
-		UnoPlayer *p = g ? g->getPlayer(ui) : nullptr;
-		if (!p || !g->has_started) {
-			c->notice(ui, "huh?? You don't have any cards.");
-			return;
-		}
-		if (g->checkMode(UnoGame::UM_LIGRETTO))
-			g->current = ui;
+		UnoPlayer *p = g->getPlayer(ui);
 
-		if (g->current != ui) {
-			c->notice(ui, "It is not your turn (current: " + g->current->nickname + ").");
-			return;
-		}
 		std::string color_s(get_next_part(msg));
 		IRC_Color color_e = IC_BLACK;
 		std::string face_s(get_next_part(msg));
@@ -699,19 +626,11 @@ public:
 
 	CHATCMD_FUNC(cmd_draw)
 	{
+		if (!checkPlayerTurn(c, ui))
+			return;
 		UnoGame *g = getGame(c);
-		UnoPlayer *p = g ? g->getPlayer(ui) : nullptr;
-		if (!p || !g->has_started) {
-			c->notice(ui, "You are not part of an ongoing game.");
-			return;
-		}
-		if (g->checkMode(UnoGame::UM_LIGRETTO))
-			g->current = ui;
+		UnoPlayer *p = g->getPlayer(ui);
 
-		if (g->current != ui) {
-			c->notice(ui, "It is not your turn (current: " + g->current->nickname + ").");
-			return;
-		}
 		auto drawn = p->drawCards(std::max(1, g->draw_count));
 		g->draw_count = 0;
 		c->notice(ui, "You drew the following cards: " + Card::format(drawn));

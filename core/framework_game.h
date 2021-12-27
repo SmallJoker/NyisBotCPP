@@ -9,8 +9,10 @@
 */
 
 template <typename PlayerT>
-class GameF_internal {
+class GameF_internal : public IContainer {
 public:
+	DISABLE_COPY(GameF_internal);
+
 	~GameF_internal()
 	{
 		for (UserInstance *ui : m_players) {
@@ -104,6 +106,7 @@ protected:
 	
 };
 
+// IMPORTANT! Only use linear inheritance. Otherwise "this" may change!
 template <typename GameT, typename PlayerT>
 class GameF_nbm : public IModule {
 public:

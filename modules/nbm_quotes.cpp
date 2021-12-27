@@ -116,21 +116,25 @@ public:
 	CHATCMD_FUNC(cmd_get)
 	{
 		auto keys = m_settings->getKeys();
+		std::remove_if(keys.begin(), keys.end(), [] (auto &str) -> bool {
+			return str == "id";
+		});
 		std::vector<std::string> matches;
 
 		if (msg.empty())
 			matches.push_back(keys[get_random() % keys.size()]);
 
 		if (matches.empty()) {
+			// Search by ID
 			long id = -1;
 			if (SettingType::parseLong(msg, &id))
 				matches.push_back(std::to_string(id));
 		}
 
 		if (matches.empty()) {
-			// Search in all quotes
+			// Search by text
 			for (cstr_t &key : keys) {
-				if (m_settings->get(key).rfind(msg) != std::string::npos)
+				if (strfindi(m_settings->get(key), msg) != std::string::npos)
 					matches.push_back(key);
 			}
 		}

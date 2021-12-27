@@ -32,8 +32,10 @@ IContainer *Containers::get(const void *owner) const
 bool Containers::remove(const void *owner)
 {
 	auto it = m_data.find(owner);
-	if (it == m_data.end())
+	if (it == m_data.end()) {
+		WARN("Attempt to remove non-existent container");
 		return false;
+	}
 
 	VERBOSE(it->second->dump());
 	delete it->second;

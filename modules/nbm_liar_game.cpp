@@ -56,7 +56,7 @@ const char *LPlayer::FACES[] = {
 };
 
 // Per-channel
-class LGame : public IContainer, public GameF_internal<LPlayer> {
+class LGame : public GameF_internal<LPlayer> {
 public:
 	std::string dump() const { return "LGame"; }
 

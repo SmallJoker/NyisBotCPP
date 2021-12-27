@@ -180,7 +180,7 @@ private:
 		m_delta = 0;
 };
 
-class UnoGame : public IContainer, public GameF_internal<UnoPlayer> {
+class UnoGame : public GameF_internal<UnoPlayer> {
 public:
 	std::string dump() const { return "UnoGame"; }
 

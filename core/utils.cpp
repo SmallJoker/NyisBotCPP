@@ -79,6 +79,15 @@ bool is_yes(std::string what)
 	return (what == "true" || what == "yes" || what == "on" || what == "enabled");
 }
 
+size_t strfindi(std::string haystack, std::string needle)
+{
+	for (char &c : haystack)
+		c = tolower(c);
+	for (char &c : needle)
+		c = tolower(c);
+	return haystack.rfind(needle);
+}
+
 int get_random()
 {
 	// Seeded by main()

@@ -68,10 +68,10 @@ struct SPlayer : public IContainer {
 	std::vector<const SCard *> cards;
 
 	// Minimal count of cards in the player's hand if the stack is non-empty
-	static const size_t MIN_IN_HAND = 5;
+	static const size_t MIN_IN_HAND = 10;
 };
 
-class SGame : public IContainer, public GameF_internal<SPlayer> {
+class SGame : public GameF_internal<SPlayer> {
 public:
 	std::string dump() const { return "SGame"; }
 
@@ -263,7 +263,7 @@ public:
 		ss << "[Shithead] " << g->getPlayerCount();
 		ss << " player(s) are waiting for a new Shithead game. ";
 		if (g->getPlayerCount() < g->MIN_PLAYERS)
-			ss << "Miniaml player count: " << g->MIN_PLAYERS;
+			ss << "Minimal player count: " << g->MIN_PLAYERS;
 		else
 			ss << "You may start it now.";
 		c->say(ss.str());
@@ -373,7 +373,7 @@ public:
 		}
 
 		if (!ok) {
-			c->notice(ui, "This card cannot played. Generally play higher cards, "
+			c->notice(ui, "This card cannot be played. Generally play higher cards, "
 				"or lower only if a [7] was played last.");
 			return;
 		}

@@ -83,9 +83,10 @@ public:
 			return false;
 
 		has_started = true;
-		current = *m_players.begin();
+		auto it = m_players.begin();
+		std::advance(it, get_random() % m_players.size());
+		current = *it;
 
-		turnNext();
 		return true;
 	}
 

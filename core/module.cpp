@@ -419,8 +419,10 @@ void ModuleInternal::unload(Network *net)
 		}
 
 		auto &users = net->getAllUsers();
-		for (auto ui : users)
-			ui->remove(module);
+		for (auto ui : users) {
+			if (ui->get(module))
+				ui->remove(module);
+		}
 	}
 
 	delete module;

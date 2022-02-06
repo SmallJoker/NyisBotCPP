@@ -279,7 +279,9 @@ public:
 
 		m_initial_player_count = m_players.size();
 		UnoPlayer *p = getPlayer(current);
-		top_card = p->cards[get_random() % p->cards.size()];
+		do {
+			top_card = p->cards[get_random() % p->cards.size()];
+		} while (top_card.face[0] == 'W'); // Defined color
 		return true;
 	}
 
@@ -526,8 +528,7 @@ public:
 			case 'B': color_e = IC_BLUE;   break;
 			case 'Y': color_e = IC_YELLOW; break;
 		}
-		bool change_face = face_s.find('W') != std::string::npos
-			|| g->top_card.color == IC_BLACK; // Possible on game start
+		bool change_face = face_s.find('W') != std::string::npos;
 		size_t face_index = Card::findType(face_s);
 
 		if (color_e == IC_BLACK || face_index == Card::FACES_MAX) {

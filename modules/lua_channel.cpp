@@ -58,6 +58,13 @@ private:
 		return 0;
 	}
 
+	static int l_get_name(lua_State *L)
+	{
+		ChannelRef *ref = checkClass(L);
+		lua_pushstring(L, ref->m_channel->getName().c_str());
+		return 1;
+	}
+
 	static int l_say(lua_State *L)
 	{
 		ChannelRef *ref = checkClass(L);
@@ -101,6 +108,19 @@ private:
 		return 1;
 	}
 
+	static int l_get_all_users(lua_State *L)
+	{
+		ChannelRef *ref = checkClass(L);
+		auto &users = ref->m_channel->getAllUsers();
+		lua_createtable(L, users.size(), 0);
+		int i = 1;
+		for (UserInstance *ui : users) {
+			lua_pushlightuserdata(L, ui);
+			lua_rawseti(L, -2, i++);
+		}
+		return 1;
+	}
+
 	static const char *m_classname;
 	static const luaL_reg m_functions[];
 
@@ -110,9 +130,11 @@ private:
 
 const char *ChannelRef::m_classname = "ChannelRef";
 const luaL_reg ChannelRef::m_functions[] = {
+	{"get_name",  l_get_name},
 	{"say",    l_say},
 	{"reply",  l_reply},
 	{"notice", l_notice},
 	{"get_nickname", l_get_nickname},
+	{"get_all_users", l_get_all_users},
 	{nullptr, nullptr}
 };

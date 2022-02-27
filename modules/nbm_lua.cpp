@@ -104,6 +104,11 @@ public:
 		}
 	
 		lua_newtable(m_lua);
+		{
+			lua_pushstring(m_lua, "clock");
+			lua_pushcfunction(m_lua, l_bot_clock);
+			lua_settable(m_lua, -3);
+		}
 		lua_setglobal(m_lua, "bot");
 
 		// Set up core functions
@@ -219,9 +224,9 @@ public:
 	{
 		if (!m_lua) return false;
 		prepareCallback("on_user_say", CBEM_ABORT_ON_TRUE);
-		ChannelRef::create(m_lua, m_client->getNetwork(), c);
-		lua_pushlightuserdata(m_lua, ui);
-		lua_pushstring(m_lua, msg.c_str());
+		ChannelRef::create(m_lua, m_client->getNetwork(), c); // 1. Channel
+		lua_pushlightuserdata(m_lua, ui); // 2. UserInstance
+		lua_pushstring(m_lua, msg.c_str()); // 3. message
 		executeCallback(c, ui, 1);
 		bool ok = lua_toboolean(m_lua, -1);
 		lua_settop(m_lua, 0);
@@ -275,16 +280,37 @@ public:
 		return 0;
 	}
 
+	static int l_bot_clock(lua_State *L)
+	{
+		std::time_t time = std::time(nullptr);
+		lua_pushinteger(L, time);
+		return 1;
+	}
+
 	static int l_check_bot_admin(lua_State *L)
 	{
 		nbm_lua *m = getModule(L);
 		Channel *c = ChannelRef::checkClass(L, 1)->get();
 		UserInstance *ui = (UserInstance *)lua_touserdata(L, 2);
 		if (c->contains(ui)) {
-			lua_pushboolean(L, m->checkBotAdmin(c, ui));
+			lua_pushboolean(L, m->checkBotAdmin(c, ui, false));
 			return 1;
 		}
 		return 0;
+	}
+
+	static int l_get_all_channels(lua_State *L)
+	{
+		nbm_lua *m = getModule(L);
+		Network *net = m->getNetwork();
+		auto &channels = net->getAllChannels();
+		lua_createtable(L, channels.size(), 0);
+		int i = 1;
+		for (Channel *c : channels) {
+			ChannelRef::create(L, net, c);
+			lua_rawseti(L, -2, i++);
+		}
+		return 1;
 	}
 
 private:

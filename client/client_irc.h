@@ -55,7 +55,7 @@ private:
 
 	// Cached settings
 	std::string m_nickname;
-	long m_auth_type;
+	int64_t m_auth_type;
 
 	// User mode. This should be enough space.
 	char m_user_modes[13] = "            ";

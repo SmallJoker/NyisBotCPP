@@ -11,6 +11,8 @@ std::string get_next_part(std::string &input);
 
 // 'true' on explicit "positive" values, 'false' otherwise
 bool is_yes(std::string what);
+// Case-insentitive string compare
+bool strequalsi(const std::string &a, const std::string &b);
 // Case-insensitive string search
 size_t strfindi(std::string haystack, std::string needle);
 

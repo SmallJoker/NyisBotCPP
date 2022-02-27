@@ -2,17 +2,18 @@
 #include "logger.h"
 #include <sstream>
 #include <fstream>
+#include <string.h> // strchr
 
-bool SettingType::parseLong(cstr_t &str, long *v, int base)
+bool SettingType::parseS64(cstr_t &str, int64_t *v, int base)
 {
 	const char *start = str.c_str();
-	return parseLong(&start, v, base);
+	return parseS64(&start, v, base);
 }
 
-bool SettingType::parseLong(const char **pos, long *v, int base)
+bool SettingType::parseS64(const char **pos, int64_t *v, int base)
 {
 	char *endp = nullptr;
-	long val = strtol(*pos, &endp, base);
+	int64_t val = strtoll(*pos, &endp, base);
 	bool read = endp && endp != *pos;
 	*pos = endp;
 	if (read)
@@ -29,6 +30,27 @@ bool SettingType::parseFloat(const char **pos, float *v)
 	if (read)
 		*v = val;
 	return read;
+}
+
+bool SettingType::parseString(const char **pos, std::string *v, char delim)
+{
+	if (delim) {
+		while (**pos == delim)
+			(*pos)++;
+	}
+	const char *endp = strchr(*pos, delim);
+
+	if (!endp)
+		endp = *pos + strlen(*pos);
+
+	if (endp == *pos) {
+		*pos = nullptr;
+		return false;
+	}
+
+	*v = std::string(*pos, endp);
+	*pos = endp + 1;
+	return true;
 }
 
 Settings::Settings(cstr_t &filename, Settings *parent, cstr_t &prefix)

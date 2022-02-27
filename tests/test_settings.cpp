@@ -159,24 +159,39 @@ void test_SettingType_util()
 {
 	std::string text("2903 C0FFEE 1.55E1 ");
 	const char *pos = text.c_str();
-	long longval;
+	int64_t longval;
 	float floatval;
+	std::string stringval;
 
-	TEST_CHECK(SettingType::parseLong(&pos, &longval) == true);
+	TEST_CHECK(SettingType::parseS64(&pos, &longval) == true);
 	TEST_CHECK(longval == 2903);
-	TEST_CHECK(SettingType::parseLong(&pos, &longval, 16) == true);
+	TEST_CHECK(SettingType::parseS64(&pos, &longval, 16) == true);
 	TEST_CHECK(longval == 0xC0FFEE);
 	TEST_CHECK(SettingType::parseFloat(&pos, &floatval) == true);
 	TEST_CHECK(std::abs(floatval - 1.55E1f) < 0.001f);
-	TEST_CHECK(SettingType::parseLong(&pos, &longval) == false);
+	TEST_CHECK(SettingType::parseS64(&pos, &longval) == false); // end
+	{
+		pos = text.c_str();
+		TEST_CHECK(SettingType::parseString(&pos, &stringval, ' ') == true);
+		TEST_CHECK(stringval == "2903");
+		TEST_CHECK(SettingType::parseString(&pos, &stringval, '.') == true);
+		TEST_CHECK(stringval == "C0FFEE 1");
+		TEST_CHECK(SettingType::parseString(&pos, &stringval, '\0') == true);
+		TEST_CHECK(stringval == "55E1 ");
+		TEST_CHECK(SettingType::parseString(&pos, &stringval, ' ') == false);
+		TEST_CHECK(pos == nullptr);
+	}
 
 	Settings::sanitizeKey(text);
 	auto parts = strsplit(text, '_');
 	TEST_CHECK(parts[0] == "2903C0FFEE155E1");
 	TEST_CHECK(parts[1].size() == 8);
-	text ="valid_key";
-	Settings::sanitizeKey(text);
-	TEST_CHECK(text == "valid_key");
+
+	{
+		text = "valid_key";
+		Settings::sanitizeKey(text);
+		TEST_CHECK(text == "valid_key");
+	}
 }
 
 void test_Settings(Unittest *ut)

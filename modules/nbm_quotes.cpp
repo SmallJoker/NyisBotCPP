@@ -40,8 +40,8 @@ public:
 		m_settings = getModuleMgr()->getSettings(this);
 		auto keys = m_settings->getKeys();
 		if (std::find(keys.begin(), keys.end(), "id") != keys.end()) {
-			long id = 0;
-			SettingType::parseLong(m_settings->get("id"), &id);
+			int64_t id = 0;
+			SettingType::parseS64(m_settings->get("id"), &id);
 			if (id >= 1)
 				m_last_id = id;
 		}
@@ -126,8 +126,8 @@ public:
 
 		if (matches.empty()) {
 			// Search by ID
-			long id = -1;
-			if (SettingType::parseLong(msg, &id))
+			int64_t id = -1;
+			if (SettingType::parseS64(msg, &id))
 				matches.push_back(std::to_string(id));
 		}
 

@@ -79,6 +79,16 @@ bool is_yes(std::string what)
 	return (what == "true" || what == "yes" || what == "on" || what == "enabled");
 }
 
+bool strequalsi(const std::string &a, const std::string &b)
+{
+	if (a.size() != b.size())
+		return false;
+	for (size_t i = 0; i < a.size(); ++i)
+		if (tolower(a[i]) != tolower(b[i]))
+			return false;
+	return true;
+}
+
 size_t strfindi(std::string haystack, std::string needle)
 {
 	for (char &c : haystack)

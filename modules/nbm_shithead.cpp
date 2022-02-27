@@ -316,7 +316,7 @@ public:
 		SPlayer *p = g->getPlayer(ui);
 
 		const SCard *played_card = nullptr;
-		long played_count = 1;
+		int64_t played_count = 1;
 		// Get card type and count
 		{
 			std::string card_s(get_next_part(msg));
@@ -333,7 +333,7 @@ public:
 			}
 
 			if (!count_s.empty())
-				SettingType::parseLong(count_s, &played_count);
+				SettingType::parseS64(count_s, &played_count);
 		}
 
 		if (!played_card) {

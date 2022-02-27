@@ -10,9 +10,9 @@ CLIArg::CLIArg(cstr_t &pfx, bool *out) : CLIArg(pfx)
 	m_dst.b = out;
 }
 
-CLIArg::CLIArg(cstr_t &pfx, long *out) : CLIArg(pfx)
+CLIArg::CLIArg(cstr_t &pfx, int64_t *out) : CLIArg(pfx)
 {
-	m_handler = &CLIArg::parseLong;
+	m_handler = &CLIArg::parseS64;
 	m_dst.l = out;
 }
 
@@ -77,7 +77,7 @@ void CLIArg::showHelp()
 		// Switch-case does not work ....
 		if (a->m_handler == &CLIArg::parseFlag) {
 			type = "flag";
-		} else if (a->m_handler == &CLIArg::parseLong) {
+		} else if (a->m_handler == &CLIArg::parseS64) {
 			type = "integer";
 			initval = std::to_string(*a->m_dst.l);
 		} else if (a->m_handler == &CLIArg::parseFloat) {
@@ -100,9 +100,11 @@ bool CLIArg::parseFlag(const char *str)
 	return 1;
 }
 
-bool CLIArg::parseLong(const char *str)
+bool CLIArg::parseS64(const char *str)
 {
-	int status = sscanf(str, "%li", m_dst.l);
+	long long val = *m_dst.l;
+	int status = sscanf(str, "%lli", &val);
+	*m_dst.l = val;
 	return status == 1;
 }
 

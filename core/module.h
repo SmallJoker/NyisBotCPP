@@ -37,7 +37,7 @@ protected:
 	Network *getNetwork() const;
 	void sendRaw(cstr_t &what) const; // TODO: remove me
 	void addClientRequest(ClientRequest && cr);
-	bool checkBotAdmin(Channel *c, UserInstance *ui) const;
+	bool checkBotAdmin(Channel *c, UserInstance *ui, bool alert = true) const;
 
 	IClient *m_client = nullptr;
 

@@ -18,9 +18,10 @@ public:
 		return "<invalid>";
 	}
 
-	static bool parseLong(cstr_t &str, long *out, int base = 10);
-	static bool parseLong(const char **str, long *v, int base = 10);
+	static bool parseS64(cstr_t &str, int64_t *v, int base = 10);
+	static bool parseS64(const char **str, int64_t *v, int base = 10);
 	static bool parseFloat(const char **str, float *v);
+	static bool parseString(const char **str, std::string *v, char delim = ' ');
 };
 
 enum SyncReason {

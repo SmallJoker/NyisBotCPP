@@ -29,6 +29,7 @@ public:
 		ChatCommand &cmd = *getModuleMgr()->getChatCommand();
 		m_commands = &cmd;
 		cmd.add("$help",     (ChatCommandAction)&nbm_builtin::cmd_help,     this);
+		cmd.add("$module", (ChatCommandAction)&nbm_builtin::cmd_module, this);
 		cmd.add("$remember", (ChatCommandAction)&nbm_builtin::cmd_remember, this);
 		cmd.add("$setting",  (ChatCommandAction)&nbm_builtin::cmd_setting, this);
 	}
@@ -87,30 +88,11 @@ public:
 		if (cmd.size() < 2 || cmd[0] != '$')
 			return false;
 
-		if (cmd == "$reload") {
-			if (!checkBotAdmin(c, ui))
-				return true;
-
-			std::string module(get_next_part(msg));
-			std::string keep(get_next_part(msg));
-
-			getModuleMgr()->reloadModule(module, is_yes(keep));
-			c->notice(ui, "Enqueued!");
-			return true;
-		}
 		if (cmd == "$quit") {
 			if (!checkBotAdmin(c, ui))
 				return true;
 
 			sendRaw("QUIT :Goodbye!");
-			return true;
-		}
-		if (cmd == "$modules") {
-			std::string text("Loaded modules:");
-			for (cstr_t &name : getModuleMgr()->getModuleList()) {
-				text.append(" " + name);
-			}
-			c->say(text);
 			return true;
 		}
 		if (cmd == "$updateauth") {
@@ -129,7 +111,34 @@ public:
 	CHATCMD_FUNC(cmd_help)
 	{
 		c->say("Available commands: " + m_commands->getList() +
-			", $reload <module> [<keep>], $list, $quit, $updateauth");
+			", $quit, $updateauth");
+	}
+
+	CHATCMD_FUNC(cmd_module)
+	{
+		std::string cmd(get_next_part(msg));
+		if (cmd == "list") {
+			std::string text("Loaded modules:");
+			for (cstr_t &name : getModuleMgr()->getModuleList()) {
+				text.append(" " + name);
+			}
+			c->say(text);
+			return;
+		}
+		if (cmd == "reload") {
+			if (!checkBotAdmin(c, ui))
+				return;
+
+			std::string module(get_next_part(msg));
+			std::string keep(get_next_part(msg));
+
+			if (getModuleMgr()->reloadModule(module, is_yes(keep)))
+				c->notice(ui, "Enqueued!");
+			else
+				c->notice(ui, "Failed to reload");
+			return;
+		}
+		c->say("Available subcommands: list, reload <name> [<keep>]");
 	}
 
 	CHATCMD_FUNC(cmd_remember)
@@ -174,7 +183,6 @@ public:
 	}
 
 private:
-	static const char STATUSUPDATE = '\0';
 	Settings *m_settings = nullptr;
 	ChatCommand *m_commands = nullptr;
 };

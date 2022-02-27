@@ -362,8 +362,8 @@ public:
 		std::set<size_t> indices;
 		while (!msg.empty()) {
 			std::string index(get_next_part(msg));
-			long out = -1;
-			if (!SettingType::parseLong(index, &out) ||
+			int64_t out = -1;
+			if (!SettingType::parseS64(index, &out) ||
 					out > (long)p->cards.size() || out < 1) {
 				c->notice(ui, "Invalid card index \"" + std::to_string(out) +
 					"\". Play one between 1 and " +

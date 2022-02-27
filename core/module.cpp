@@ -57,13 +57,14 @@ void IModule::addClientRequest(ClientRequest && cr)
 	m_client->addRequest(std::move(cr));
 }
 
-bool IModule::checkBotAdmin(Channel *c, UserInstance *ui) const
+bool IModule::checkBotAdmin(Channel *c, UserInstance *ui, bool alert) const
 {
 	cstr_t &admin = getModuleMgr()->getGlobalSettings()->get("client.admin");
 	if (ui->nickname == admin && ui->account == UserInstance::UAS_LOGGED_IN)
 		return true;
 
-	c->reply(ui, "Insufficient privileges.");
+	if (alert)
+		c->reply(ui, "Insufficient privileges.");
 	return false;
 }
 
@@ -110,7 +111,7 @@ bool ModuleMgr::loadModules()
 		size_t cut_b = filename.find('.');
 		if (cut_a == std::string::npos || cut_b == std::string::npos)
 			continue;
-		if (entry.path().extension() == "so")
+		if (entry.path().extension() != ".so")
 			continue;
 
 		cut_a += NAME_PREFIX.size();

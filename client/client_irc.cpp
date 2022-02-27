@@ -51,11 +51,11 @@ ClientIRC::~ClientIRC()
 void ClientIRC::initialize()
 {
 	m_nickname = m_settings->get("irc.nickname");
-	SettingType::parseLong(m_settings->get("irc.authtype"), &m_auth_type);
+	SettingType::parseS64(m_settings->get("irc.authtype"), &m_auth_type);
 
 	const std::string &addr = m_settings->get("irc.address");
-	long port = 0;
-	SettingType::parseLong(m_settings->get("irc.port"), &port);
+	int64_t port = 0;
+	SettingType::parseS64(m_settings->get("irc.port"), &port);
 
 	m_con = Connection::createStream(addr, port);
 	m_con->connect();
@@ -424,8 +424,8 @@ void ClientIRC::handleAuthentication(cstr_t &status, NetworkEvent *e)
 		sendRaw("USER " + m_nickname + " foo bar :Generic description");
 		sendRaw("NICK " + m_nickname);
 
-		long type = 0;
-		SettingType::parseLong(m_settings->get("irc.authtype"), &type);
+		int64_t type = 0;
+		SettingType::parseS64(m_settings->get("irc.authtype"), &type);
 		if (type > 0)
 			m_auth_status = AS_AUTHENTICATE;
 

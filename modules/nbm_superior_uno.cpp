@@ -65,10 +65,10 @@ public:
 	{
 		const char *pos = str.c_str();
 
-		return parseLong(&pos, &m_wins)
-			&& parseLong(&pos, &m_losses)
-			&& parseLong(&pos, &m_elo)
-			&& parseLong(&pos, &m_streak);
+		return parseS64(&pos, &m_wins)
+			&& parseS64(&pos, &m_losses)
+			&& parseS64(&pos, &m_elo)
+			&& parseS64(&pos, &m_streak);
 	}
 
 	// For settings
@@ -166,14 +166,14 @@ public:
 		return ss.str();
 	}
 
-	long getElo() const
+	int64_t getElo() const
 	{ return m_elo; }
 
 	std::vector<Card> cards;
 	static const size_t MIN_PLAYERS = true ? 2 : 1; // Debug mode
 private:
 	static const int GAIN_FACTOR = 20;
-	long m_wins = 0,
+	int64_t m_wins = 0,
 		m_losses = 0,
 		m_streak = 0,
 		m_elo = 1000,
@@ -427,8 +427,8 @@ public:
 
 		if (is_new) {
 			std::string modes(get_next_part(msg));
-			long val = g->modes;
-			if (SettingType::parseLong(modes, &val, 16))
+			int64_t val = g->modes;
+			if (SettingType::parseS64(modes, &val, 16))
 				g->modes = val; // Data loss
 		}
 

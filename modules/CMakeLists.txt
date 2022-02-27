@@ -23,6 +23,7 @@ my_add_module("nbm_liar_game")
 my_add_module("nbm_quotes")
 my_add_module("nbm_shithead")
 my_add_module("nbm_superior_uno")
+my_add_module("nbm_tell")
 my_add_module("nbm_timebomb")
 
 find_package(Lua)

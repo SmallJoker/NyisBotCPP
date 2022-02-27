@@ -1,0 +1,18 @@
+# This is for "client.type = tui" configurations
+#
+# load ../tests/test_nbm_tell.txt
+
+reload tell yes
+
+channel add #test
+user add FOO #test
+user add BAR #test
+
+user say FOO #test $tell BAR Hello world. This is supposed to work!
+user say BAR #test dummy message
+
+step 300
+user say FOO #test $tell BAR Hello world. This is supposed to work!
+step 300
+user say FOO #test $tell BAR Hello world. This is supposed to work!
+user say BAR #test dummy message

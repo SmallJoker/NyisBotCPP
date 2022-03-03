@@ -15,7 +15,7 @@ bot.chatcommands["$sell"] = function(c, ui, msg)
 	elseif n > 18 then
 		return "FBI open up! " .. c:get_nickname(ui) .. " tried to sell the illegal " .. msg
 	elseif n > 12 then
-		return text .. " cannot be sold. " .. c:get_nickname(ui) .. " lost $" ..
+		return msg .. " cannot be sold. " .. c:get_nickname(ui) .. " lost $" ..
 			math.ceil(math.random() * 20) * 5 .. " to this nonsense effort."
 	elseif n > 6 then
 		return msg .. " caused an exception in the matrix. Trynfiw ts94 s:fe sa " ..

@@ -181,23 +181,23 @@ public:
 	{
 		if (!m_lua) return;
 		prepareCallback("on_channel_join", CBEM_NO_ABORT);
-		lua_pushstring(m_lua, c->getName().c_str());
-		executeCallback(c);
+		ChannelRef::create(m_lua, getNetwork(), c);
+		executeCallback();
 	}
 
 	void onChannelLeave(Channel *c)
 	{
 		if (!m_lua) return;
 		prepareCallback("on_channel_leave", CBEM_NO_ABORT);
-		ChannelRef::create(m_lua, m_client->getNetwork(), c);
-		executeCallback(c);
+		ChannelRef::create(m_lua, getNetwork(), c);
+		executeCallback();
 	}
 
 	void onUserJoin(Channel *c, UserInstance *ui)
 	{
 		if (!m_lua) return;
 		prepareCallback("on_user_join", CBEM_NO_ABORT);
-		ChannelRef::create(m_lua, m_client->getNetwork(), c);
+		ChannelRef::create(m_lua, getNetwork(), c);
 		lua_pushlightuserdata(m_lua, ui);
 		executeCallback();
 	}
@@ -206,7 +206,7 @@ public:
 	{
 		if (!m_lua) return;
 		prepareCallback("on_user_leave", CBEM_NO_ABORT);
-		ChannelRef::create(m_lua, m_client->getNetwork(), c);
+		ChannelRef::create(m_lua, getNetwork(), c);
 		lua_pushlightuserdata(m_lua, ui);
 		executeCallback();
 	}
@@ -224,7 +224,7 @@ public:
 	{
 		if (!m_lua) return false;
 		prepareCallback("on_user_say", CBEM_ABORT_ON_TRUE);
-		ChannelRef::create(m_lua, m_client->getNetwork(), c); // 1. Channel
+		ChannelRef::create(m_lua, getNetwork(), c); // 1. Channel
 		lua_pushlightuserdata(m_lua, ui); // 2. UserInstance
 		lua_pushstring(m_lua, msg.c_str()); // 3. message
 		executeCallback(c, ui, 1);
@@ -292,8 +292,9 @@ public:
 		nbm_lua *m = getModule(L);
 		Channel *c = ChannelRef::checkClass(L, 1)->get();
 		UserInstance *ui = (UserInstance *)lua_touserdata(L, 2);
+		bool alert = lua_isnoneornil(L, 3) ? false : lua_toboolean(L, 3);
 		if (c->contains(ui)) {
-			lua_pushboolean(L, m->checkBotAdmin(c, ui, false));
+			lua_pushboolean(L, m->checkBotAdmin(c, ui, alert));
 			return 1;
 		}
 		return 0;

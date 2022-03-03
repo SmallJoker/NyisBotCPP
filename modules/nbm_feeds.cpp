@@ -117,7 +117,7 @@ public:
 			return "XML parser failed";
 		}
 
-		time_t last_check = time(nullptr);
+		time_t last_check = 0;
 		{
 			auto it = f->last_update.find(key);
 			if (it != f->last_update.end())
@@ -148,6 +148,11 @@ public:
 
 			if (timestamp > time_newest)
 				time_newest = timestamp;
+
+			if (last_check == 0) {
+				// Init cycle. Update to newest timestamp
+				continue;
+			}
 
 			if (msg_limit-- == 0) {
 				LOG("Limit reached!");

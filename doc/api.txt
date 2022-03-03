@@ -1,0 +1,90 @@
+C++ API
+=======
+
+
+
+
+
+
+Lua API
+=======
+
+error(...)
+	Logs and throws a Lua error
+	Params: values to log
+
+print(...)
+	Logs the provided values
+	Params: values to log
+
+bot.clock()
+	Returns: numeric, Unix timestamp
+
+bot.check_bot_admin(channel, ui, [alert=false])
+	Available after init
+	Param alert: boolean, whether to notify about permission violation
+	Returns: true/false or nil (unknown user)
+
+bot.get_all_channels()
+	Available after init
+	Returns: table, all ChannelRef
+
+bot.settings
+	Is a SettingsRef. Module-specific settings
+
+
+ChannelRef class
+----------------
+"ui" refers to a user reference. There is yet no class for it.
+
+self:get_name()
+	Returns: Channel name
+self:say(text)
+self:reply(ui, msg)
+self:notice(ui, msg)
+	Sends a private message to the user
+self:get_nickname(ui)
+	Returns: user nickname or nil (unknown user)
+self:get_all_users()
+	Returns: table, references of all users
+
+
+SettingsRef class
+-----------------
+self:get(key)
+	Param key: string
+	Returns: string, "" if not found
+self:set(key, value)
+	Param key: string
+	Param value: string
+	Returns: true/false indicating success
+self:remove(key)
+	Param key: string
+	Returns: true/false indicating success
+self:save()
+	Triggers a write sync action
+
+
+Callbacks
+---------
+
+bot.register_CALLBACK(func)
+	Registers a callback
+
+List of CALLBACK options:
+	on_client_ready()
+	on_step(dtime)
+	on_channel_join(channel)
+		Executed after joining
+	on_channel_leave(channel)
+		Executed before leaving, but messages cannot be sent
+	on_user_join(channel, ui)
+	on_user_leave(channel, ui)
+	on_user_rename(ui, new_name)
+	on_user_say(channel, ui, msg)
+		Return true to abort the callback
+
+bot.chatcommands[word1][...] = function(channel, ui, msg)
+	Return value options:
+		text 
+		success, msg

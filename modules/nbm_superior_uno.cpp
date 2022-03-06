@@ -599,7 +599,7 @@ public:
 			} else if (strcmp(g->top_card.face, "WD4") != 0) {
 				// Acts as Skip for 2 players
 				// do not skip when reversing the draw stack ("no u!")
-				g->turnNext();
+				pending_autodraw = true;
 			}
 		} else if (face_s == "S") {
 			g->turnNext();

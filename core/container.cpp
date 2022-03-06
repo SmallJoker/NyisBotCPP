@@ -33,7 +33,7 @@ bool Containers::remove(const void *owner)
 {
 	auto it = m_data.find(owner);
 	if (it == m_data.end()) {
-		WARN("Attempt to remove non-existent container");
+		VERBOSE("Attempt to remove non-existent container");
 		return false;
 	}
 

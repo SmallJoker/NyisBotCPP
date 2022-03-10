@@ -18,9 +18,12 @@ public:
 	UserInstance(cstr_t &name);
 	int getRefs() const { return m_references; }
 
-	std::string nickname;
-	std::string hostmask;
+	// TODO: add Client-specific UID type
 
+	std::string nickname;
+
+	// TODO: Move IRC-specific code
+	std::string hostmask;
 	// Valid for ACC and STATUS
 	enum UserAccStatus {
 		UAS_PENDING = -2,
@@ -47,7 +50,7 @@ private:
 			delete this;
 	}
 
-	int m_references;
+	int m_references = 0;
 };
 
 class IUserOwner {
@@ -60,11 +63,13 @@ public:
 	bool removeUser(UserInstance *ui);
 	bool contains(UserInstance *ui) const;
 
+	//std::string formatPing(UserInstance *ui) const;
+
 	std::set<UserInstance *> &getAllUsers()
 	{ return m_users; }
 
 protected:
-	IClient *m_client = nullptr;
+	IClient *m_client;
 
 	// Per-user data
 	std::set<UserInstance *> m_users;
@@ -123,8 +128,6 @@ public:
 
 private:
 	//static const time_t TEMP_CHANNEL_TIMEOUT = 300;
-
-	std::string m_last_active_channel;
 
 	std::set<Channel *> m_channels;
 	//std::map<Channel *, time_t> m_channels_temp;

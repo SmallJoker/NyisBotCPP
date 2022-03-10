@@ -2,15 +2,26 @@
 #include "logger.h"
 #include "client/client_discord.h"
 #include "client/client_irc.h"
+#include "client/client_telegram.h"
 #include "client/client_tui.h"
 #include "connection.h"
 #include "module.h"
 #include "settings.h"
 #include "tests/test.h"
+#ifdef __unix__
+	#include <signal.h>
+#endif
 
 static IClient *s_cli = nullptr;
 static Settings *settings_ro = nullptr;
 static Settings *settings_rw = nullptr;
+static bool keep_running = true;
+
+void sigint_handler(int signal)
+{
+	LOG("Received signal " << signal);
+	keep_running = false;
+}
 
 void exit_main()
 {
@@ -22,10 +33,19 @@ void exit_main()
 	SLEEP_MS(100);
 }
 
+
 extern "C" {
 
 DLL_EXPORT int main(int argc, char *argv[])
 {
+#ifdef __unix__
+	{
+		struct sigaction act;
+		act.sa_handler = sigint_handler;
+		sigaction(SIGINT, &act, NULL);
+		sigaction(SIGTERM, &act, NULL);
+	}
+#endif
 	atexit(exit_main);
 	g_logger = new Logger();
 
@@ -76,6 +96,8 @@ DLL_EXPORT int main(int argc, char *argv[])
 		s_cli = new ClientTUI(settings_rw);
 	else if (client_type == "discord")
 		s_cli = new ClientDiscord(settings_rw);
+	else if (client_type == "telegram")
+		s_cli = new ClientTelegram(settings_rw);
 
 	ASSERT(s_cli, "client.type setting value is not supported.");
 
@@ -87,7 +109,7 @@ DLL_EXPORT int main(int argc, char *argv[])
 	if (run_client) {
 		s_cli->initialize();
 
-		while (s_cli->run()) {
+		while (keep_running && s_cli->run()) {
 			s_cli->processRequests();
 			SLEEP_MS(20);
 		}

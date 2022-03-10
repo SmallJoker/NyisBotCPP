@@ -84,7 +84,7 @@ private:
 	void unloadSingleModule(ModuleInternal *mi, bool keep_data = false);
 
 	std::chrono::high_resolution_clock::time_point m_last_step;
-	mutable std::mutex m_lock;
+	mutable std::recursive_mutex m_lock;
 	std::set<ModuleInternal *> m_modules;
 	ChatCommand *m_commands = nullptr;
 	IClient *m_client;

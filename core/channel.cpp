@@ -6,10 +6,9 @@
 
 // ================= UserInstance =================
 
-UserInstance::UserInstance(cstr_t &name)
+UserInstance::UserInstance(cstr_t &uid)
 {
-	nickname = name;
-	m_references = 0;
+	this->nickname = uid;
 }
 
 
@@ -51,6 +50,7 @@ UserInstance *IUserOwner::addUser(cstr_t &name)
 
 UserInstance *IUserOwner::getUser(cstr_t &name) const
 {
+	// TODO: Per-client specific function calls?
 	for (UserInstance *ui : m_users) {
 		if (ui->nickname.size() != name.size())
 			continue;

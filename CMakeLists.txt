@@ -13,6 +13,7 @@ set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads REQUIRED) # pthread
 find_package(pugixml REQUIRED)
 
+add_definitions(-DPICOJSON_USE_INT64)
 find_path(PICOJSON_INCLUDE_DIR picojson.h)
 
 # More packages:

@@ -37,6 +37,7 @@ Connection *Connection::createHTTP(cstr_t &method, cstr_t &url)
 {
 	Connection *con = new Connection(CT_HTTP);
 	curl_easy_setopt(con->m_curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2_0);
+	curl_easy_setopt(con->m_curl, CURLOPT_TIMEOUT_MS, (long)CURL_TIMEOUT);
 	curl_easy_setopt(con->m_curl, CURLOPT_URL, url.c_str());
 
 	if (method == "GET")

@@ -99,7 +99,7 @@ ModuleMgr::~ModuleMgr()
 
 bool ModuleMgr::loadModules()
 {
-	MutexLock _(m_lock);
+	MutexLockR _(m_lock);
 	if (!m_modules.empty())
 		return false;
 
@@ -192,7 +192,7 @@ bool ModuleMgr::reloadModule(std::string name, bool keep_data)
 
 void ModuleMgr::unloadModules()
 {
-	MutexLock _(m_lock);
+	MutexLockR _(m_lock);
 	if (m_modules.empty())
 		return;
 
@@ -274,7 +274,7 @@ Settings *ModuleMgr::getGlobalSettings() const
 
 void ModuleMgr::onStep(float time)
 {
-	MutexLock _(m_lock);
+	MutexLockR _(m_lock);
 
 	auto time_now = std::chrono::high_resolution_clock::now();
 	// Allow custom intervals
@@ -310,42 +310,42 @@ void ModuleMgr::onStep(float time)
 
 void ModuleMgr::onChannelJoin(Channel *c)
 {
-	MutexLock _(m_lock);
+	MutexLockR _(m_lock);
 	for (ModuleInternal *mi : m_modules)
 		mi->module->onChannelJoin(c);
 }
 
 void ModuleMgr::onChannelLeave(Channel *c)
 {
-	MutexLock _(m_lock);
+	MutexLockR _(m_lock);
 	for (ModuleInternal *mi : m_modules)
 		mi->module->onChannelLeave(c);
 }
 
 void ModuleMgr::onUserJoin(Channel *c, UserInstance *ui)
 {
-	MutexLock _(m_lock);
+	MutexLockR _(m_lock);
 	for (ModuleInternal *mi : m_modules)
 		mi->module->onUserJoin(c, ui);
 }
 
 void ModuleMgr::onUserLeave(Channel *c, UserInstance *ui)
 {
-	MutexLock _(m_lock);
+	MutexLockR _(m_lock);
 	for (ModuleInternal *mi : m_modules)
 		mi->module->onUserLeave(c, ui);
 }
 
 void ModuleMgr::onUserRename(UserInstance *ui, cstr_t &old_name)
 {
-	MutexLock _(m_lock);
+	MutexLockR _(m_lock);
 	for (ModuleInternal *mi : m_modules)
 		mi->module->onUserRename(ui, old_name);
 }
 
 bool ModuleMgr::onUserSay(Channel *c, UserInstance *ui, std::string &msg)
 {
-	MutexLock _(m_lock);
+	MutexLockR _(m_lock);
 
 	std::string backup(msg);
 	if (m_commands->run(c, ui, msg))
@@ -363,7 +363,7 @@ bool ModuleMgr::onUserSay(Channel *c, UserInstance *ui, std::string &msg)
 
 void ModuleMgr::onUserStatusUpdate(UserInstance *ui, bool is_timeout)
 {
-	MutexLock _(m_lock);
+	MutexLockR _(m_lock);
 	m_status_update_timeout.erase(ui);
 	for (ModuleInternal *mi : m_modules)
 		mi->module->onUserStatusUpdate(ui, is_timeout);

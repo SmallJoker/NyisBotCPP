@@ -121,7 +121,7 @@ public:
 	CHATCMD_FUNC(cmd_cutwire)
 	{
 		MyTimebomb *tb = (MyTimebomb *)c->getContainers()->get(this);
-		if (!tb->victim)
+		if (!tb || !tb->victim)
 			return;
 
 		std::string selected(get_next_part(msg));

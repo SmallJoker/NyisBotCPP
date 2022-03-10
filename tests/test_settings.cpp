@@ -40,6 +40,7 @@ public:
 
 std::string settings_test_data1 =
 	"key_t = $$ text value121.s\n"
+	"\n"
 	"key_i = 3\n"
 	"unit.foobar = abc abc\n"
 	"unit.baz = nyan\n"
@@ -48,6 +49,7 @@ std::string settings_test_data1 =
 // After write manipulations
 std::string settings_test_data2 =
 	"key_t = $$ text value121.s\n"
+	"\n"
 	"key_i = 999\n"
 	"unit.baz = kittens are cute\n"
 	"random = true\n"

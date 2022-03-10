@@ -35,7 +35,7 @@ bool SettingType::parseFloat(const char **pos, float *v)
 bool SettingType::parseString(const char **pos, std::string *v, char delim)
 {
 	if (delim) {
-		while (**pos == delim)
+		while (**pos == delim && **pos)
 			(*pos)++;
 	}
 	const char *endp = strchr(*pos, delim);
@@ -49,7 +49,7 @@ bool SettingType::parseString(const char **pos, std::string *v, char delim)
 	}
 
 	*v = std::string(*pos, endp);
-	*pos = endp + 1;
+	*pos = endp + (*endp != '\0'); // +1 if not terminated
 	return true;
 }
 
@@ -226,7 +226,7 @@ std::vector<std::string> Settings::getKeys() const
 	}
 	return keys;
 }
-
+#include <iostream>
 bool Settings::syncFileContents(SyncReason reason)
 {
 	if (m_is_fork)
@@ -267,6 +267,8 @@ bool Settings::syncFileContents(SyncReason reason)
 	while (is.good() && ++line_n) {
 		std::string line;
 		std::getline(is, line);
+		if (is.eof() && line.empty())
+			break;
 
 		enum {
 			LS_KEEP,
@@ -333,8 +335,7 @@ bool Settings::syncFileContents(SyncReason reason)
 			if (line_status == LS_TODO)
 				*of << '#'; // Comment erroneous lines
 
-			if (line.size() > 0)
-				*of << line << std::endl;
+			*of << line << std::endl;
 		}
 	}
 

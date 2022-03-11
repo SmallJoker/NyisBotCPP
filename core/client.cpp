@@ -24,6 +24,11 @@ IClient::~IClient()
 		m_settings->syncFileContents(SR_WRITE);
 }
 
+IFormatter *IClient::createFormatter() const
+{
+	return new IFormatter();
+}
+
 void IClient::addRequest(ClientRequest && cr)
 {
 	m_requests_lock.lock();

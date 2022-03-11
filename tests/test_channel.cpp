@@ -28,6 +28,22 @@ struct RefContainer : public IContainer {
 	~RefContainer() { instances--; }
 };
 
+struct UserIdTest : IUserId {
+	bool equals(const IUserId *b) const
+	{
+		return nickname == ((UserIdTest *)b)->nickname;
+	}
+	bool matches(cstr_t &what) const
+	{
+		return strequalsi(nickname, what);
+	}
+
+	IUserId *copy() const { return new UserIdTest(*this); }
+
+	UserIdTest(cstr_t &nick) : nickname(nick) {}
+	std::string nickname;
+};
+
 void test_Network_Channel_UserInstance()
 {
 	Network &n = *client->getNetwork();
@@ -38,12 +54,13 @@ void test_Network_Channel_UserInstance()
 
 	instances = 0;
 	{
-		UserInstance *ui_d = c->addUser("Donald");
-		TEST_CHECK(c->addUser("Donald") == ui_d);
+		UserInstance *ui_d = c->addUser(UserIdTest("Donald"));
+		TEST_CHECK(c->addUser(UserIdTest("Donald")) == ui_d);
 		ui_d->set(nullptr, new RefContainer());
 
 		TEST_CHECK(c->getUser("Mickey") == nullptr);
-		UserInstance *ui_m = c->addUser("Mickey");
+		UserInstance *ui_m = c->addUser(UserIdTest("Mickey"));
+		TEST_CHECK(c->getUser("miCKey") == ui_m);
 		ui_m->set(nullptr, new RefContainer());
 
 		TEST_CHECK(c->removeUser(ui_m) == true);

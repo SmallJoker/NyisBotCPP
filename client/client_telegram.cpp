@@ -7,16 +7,70 @@
 #include <memory>
 #include <sstream>
 
+
+// ============ User ID ============
+
+struct UserIdTelegram : IUserId {
+	bool equals(const IUserId *b) const
+	{
+		return user_id == ((UserIdTelegram *)b)->user_id;
+	}
+	bool matches(cstr_t &what) const
+	{
+		// TODO: Is this correct?
+		return std::to_string(user_id) == what;
+	}
+
+	IUserId *copy() const { return new UserIdTelegram(*this); }
+
+	UserIdTelegram(int64_t id) : user_id(id) {}
+	int64_t user_id;
+};
+
+
+// ============ Formatter ============
+
+class FormatterTelegram : public IFormatter {
+public:
+	void mention(UserInstance *ui)
+	{
+		*m_os << "[" << ui->nickname << "](tg://user?id="
+			<< ((UserIdTelegram *)ui->uid)->user_id << ")";
+	}
+
+	void beginImpl(IRC_Color color)
+	{
+		// requires HTML style
+	}
+
+	void beginImpl(FormatType flags)
+	{
+		if (flags & FT_BOLD)
+			*m_os << "**";
+		if (flags & FT_ITALICS)
+			*m_os << "_";
+		if (flags & FT_UNDERL)
+			*m_os << "__";
+	}
+
+	void endImpl(FormatType flags)
+	{
+		if (flags & FT_BOLD)
+			*m_os << "**";
+		if (flags & FT_ITALICS)
+			*m_os << "_";
+		if (flags & FT_UNDERL)
+			*m_os << "_\r_";
+		//if (flags & FT_COLOR)
+	}
+};
+
+
+// ============ Client class ============
+
 struct ClientTelegramActionEntry {
 	const char *type;
 	void (ClientTelegram::*handler)(cstr_t &type, picojson::value &v);
-};
-
-struct ClientTelegramUserData : public IContainer {
-	std::string dump() const { return "Telegram"; }
-
-	std::string username;
-	bool is_bot = false;
 };
 
 ClientTelegram::ClientTelegram(Settings *settings) :
@@ -59,16 +113,15 @@ void ClientTelegram::actionSay(Channel *c, cstr_t &text)
 
 void ClientTelegram::actionReply(Channel *c, UserInstance *ui, cstr_t &text)
 {
-	auto d = getUserDataOrCreate(ui);
-	std::stringstream ss;
-	// TODO: Move to a formatPing() function
-	ss << "[" << d->username << "](tg://user?id=" << ui->nickname << ") : ";
-	ss << "`" << text << "`";
+	std::unique_ptr<IFormatter> fmt(createFormatter());
+
+	fmt->mention(ui);
+	*fmt << ": `" << text << "`";
 
 	picojson::object inp;
 	inp["chat_id"] = picojson::value(c->getName());
 	inp["parse_mode"] = picojson::value("MarkdownV2");
-	inp["text"] = picojson::value(ss.str());
+	inp["text"] = picojson::value(fmt->str());
 
 	REQUEST_WRAP(out, "POST", "sendMessage", &inp);
 }
@@ -92,6 +145,11 @@ void ClientTelegram::actionLeave(Channel *c)
 	REQUEST_WRAP(out, "POST", "leaveChat", &inp);
 	if (out)
 		LOG(out->serialize(true));
+}
+
+IFormatter *ClientTelegram::createFormatter() const
+{
+	return new FormatterTelegram();
 }
 
 bool ClientTelegram::run()
@@ -212,22 +270,12 @@ Channel *ClientTelegram::joinChannelIfNeeded(cstr_t &channel_id)
 		//LOG(out_admins->serialize(true));
 		for (auto &user : out_admins->get<picojson::array>()) {
 			int64_t user_id = user.get("user").get("id").get<int64_t>();
-			c->addUser(std::to_string(user_id));
+			c->addUser(UserIdTelegram(user_id));
 		}
 	}
 
 	m_module_mgr->onChannelJoin(c);
 	return c;
-}
-
-ClientTelegramUserData *ClientTelegram::getUserDataOrCreate(UserInstance *ui)
-{
-	ClientTelegramUserData *d = (ClientTelegramUserData *)ui->get(this);
-	if (!d) {
-		d = new ClientTelegramUserData();
-		ui->set(this, d);
-	}
-	return d;
 }
 
 const ClientTelegramActionEntry ClientTelegram::s_actions[] = {
@@ -259,17 +307,15 @@ void ClientTelegram::handleMessage(cstr_t &type, picojson::value &v)
 	if (user_id == m_my_user_id)
 		return;
 
-	std::string username(std::to_string(user_id));
-	UserInstance *ui = c->getUser(username);
+	UserInstance *ui = c->getUser(UserIdTelegram(user_id));
 	if (!ui) {
-		ui = c->addUser(username);
+		ui = c->addUser(UserIdTelegram(user_id));
 		m_module_mgr->onUserJoin(c, ui);
 	}
 	{
 		// Update information
-		auto d = getUserDataOrCreate(ui);
-		d->username = v_from.get("first_name").get<std::string>();
-		d->is_bot = v_from.get("is_bot").evaluate_as_boolean();
+		ui->nickname = v_from.get("first_name").get<std::string>();
+		ui->is_bot = v_from.get("is_bot").evaluate_as_boolean();
 	}
 
 	std::string msg(v.get("text").get<std::string>());
@@ -279,7 +325,7 @@ void ClientTelegram::handleMessage(cstr_t &type, picojson::value &v)
 		auto &os = g_logger->getStdout(LL_NORMAL);
 		write_timestamp(&os);
 		os << " ";
-		os << username << " \t";
+		os << ui->nickname << " \t";
 		os << msg << std::endl;
 	}
 

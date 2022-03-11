@@ -6,9 +6,10 @@
 
 // ================= UserInstance =================
 
-UserInstance::UserInstance(cstr_t &uid)
+UserInstance::UserInstance(const IUserId &uid) :
+	uid(uid.copy())
 {
-	this->nickname = uid;
+	this->nickname = "(nickname)";
 }
 
 
@@ -30,16 +31,16 @@ IUserOwner::~IUserOwner()
 	m_users.clear();
 }
 
-UserInstance *IUserOwner::addUser(cstr_t &name)
+UserInstance *IUserOwner::addUser(const IUserId &uid)
 {
-	UserInstance *ui = getUser(name);
+	UserInstance *ui = getUser(uid);
 
 	if (!ui) {
 		// Network must always have a reference
 		if (this == m_client->getNetwork())
-			ui = new UserInstance(name);
+			ui = new UserInstance(uid);
 		else
-			ui = m_client->getNetwork()->addUser(name);
+			ui = m_client->getNetwork()->addUser(uid);
 		ui->grabRef();
 	}
 
@@ -48,21 +49,22 @@ UserInstance *IUserOwner::addUser(cstr_t &name)
 	return ui;
 }
 
+UserInstance *IUserOwner::getUser(const IUserId &uid) const
+{
+	for (UserInstance *ui : m_users) {
+		if (uid.equals(ui->uid))
+			return ui;
+	}
+	return nullptr;
+}
+
 UserInstance *IUserOwner::getUser(cstr_t &name) const
 {
-	// TODO: Per-client specific function calls?
 	for (UserInstance *ui : m_users) {
-		if (ui->nickname.size() != name.size())
-			continue;
-
-		// Case-insensitive check
-		for (size_t i = 0; i < name.size(); ++i) {
-			if (tolower(ui->nickname[i]) != tolower(name[i]))
-				goto mismatch;
-		}
-		return ui;
-mismatch:
-		continue;
+		if (strequalsi(ui->nickname, name))
+			return ui;
+		if (ui->uid->matches(name))
+			return ui;
 	}
 	return nullptr;
 }
@@ -88,6 +90,11 @@ bool IUserOwner::removeUser(UserInstance *ui)
 bool IUserOwner::contains(UserInstance *ui) const
 {
 	return m_users.find(ui) != m_users.end();
+}
+
+IFormatter *IUserOwner::createFormatter() const
+{
+	return m_client->createFormatter();
 }
 
 

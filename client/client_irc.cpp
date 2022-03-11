@@ -10,6 +10,69 @@
 #include <iostream>
 #include <memory> // unique_ptr
 
+
+// ============ User ID ============
+
+struct UserIdIRC : IUserId {
+	bool equals(const IUserId *b) const
+	{
+		return nickname == ((UserIdIRC *)b)->nickname;
+	}
+	bool matches(cstr_t &what) const
+	{
+		return strequalsi(nickname, what);
+	}
+
+	IUserId *copy() const { return new UserIdIRC(*this); }
+
+	UserIdIRC(cstr_t &nick) : nickname(nick) {}
+	std::string nickname;
+	std::string hostmask;
+};
+
+
+// ============ Formatter ============
+
+class FormatterIRC : public IFormatter {
+public:
+	void mention(UserInstance *ui)
+	{
+		*m_os << std::string("(invalid)");
+	}
+
+	void beginImpl(IRC_Color color)
+	{
+		*m_os << "\x03";
+		if ((int)color < 10)
+			*m_os << '0';
+		*m_os << (int)color;
+	}
+
+	void beginImpl(FormatType flags)
+	{
+		endImpl(flags); // same
+	}
+
+	void endImpl(FormatType flags)
+	{
+		if (flags == FT_ALL) {
+			*m_os << '\x0F';
+			return;
+		}
+		if (flags & FT_BOLD)
+			*m_os << '\x02';
+		if (flags & FT_ITALICS)
+			*m_os << '\x1D';
+		if (flags & FT_UNDERL)
+			*m_os << '\x1F';
+		if (flags & FT_COLOR)
+			*m_os << "\x03\u200B";
+	}
+};
+
+
+// ============ Client class ============
+
 struct ClientActionEntry {
 	size_t offset;
 	const char *status;
@@ -123,6 +186,11 @@ void ClientIRC::actionJoin(cstr_t &channel)
 void ClientIRC::actionLeave(Channel *c)
 {
 	sendRaw("PART " + c->getName());
+}
+
+IFormatter *ClientIRC::createFormatter() const
+{
+	return new FormatterIRC();
 }
 
 bool ClientIRC::run()
@@ -243,11 +311,13 @@ void ClientIRC::handleClientEvent(cstr_t &status, NetworkEvent *e)
 		Channel *c = m_network->getChannel(channel);
 		if (!c) {
 			c = m_network->addChannel(channel);
-			c->addUser(m_nickname);
+			// Add bot to channel
+			c->addUser(UserIdIRC(m_nickname));
 		}
 
-		UserInstance *ui = c->addUser(e->nickname);
-		ui->hostmask = e->hostmask;
+		// Add newly joined user
+		UserInstance *ui = c->addUser(UserIdIRC(e->nickname));
+		((UserIdIRC *)ui->uid)->hostmask = e->hostmask;
 		requestAccStatus(ui);
 
 		if (e->nickname != m_nickname)
@@ -287,7 +357,8 @@ void ClientIRC::handleClientEvent(cstr_t &status, NetworkEvent *e)
 	}
 	if (status == "NICK") {
 		// nick!host NICK :NewNickname
-		UserInstance *ui = m_network->getUser(e->nickname);
+		UserInstance *ui = m_network->getUser(UserIdIRC(e->nickname));
+		((UserIdIRC *)ui->uid)->nickname = e->text;
 		ui->nickname = e->text;
 		requestAccStatus(ui);
 
@@ -429,7 +500,7 @@ void ClientIRC::handleAuthentication(cstr_t &status, NetworkEvent *e)
 		if (type > 0)
 			m_auth_status = AS_AUTHENTICATE;
 
-		m_network->addUser(m_nickname);
+		m_network->addUser(UserIdIRC(m_nickname));
 		return;
 	}
 	if (status == "396") {
@@ -452,7 +523,7 @@ void ClientIRC::handleServerMessage(cstr_t &status, NetworkEvent *e)
 			if (strchr("~&@%+", name[0]))
 				name = name.substr(1);
 
-			c->addUser(name);
+			c->addUser(UserIdIRC(name));
 		}
 		m_module_mgr->onChannelJoin(c);
 		return;

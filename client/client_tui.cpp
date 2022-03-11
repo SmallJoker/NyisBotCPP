@@ -10,6 +10,27 @@
 #include <sstream>
 #include <string.h>
 
+// ============ User ID ============
+
+struct UserIdTUI : IUserId {
+	bool equals(const IUserId *b) const
+	{
+		return nickname == ((UserIdTUI *)b)->nickname;
+	}
+	bool matches(cstr_t &what) const
+	{
+		return strequalsi(nickname, what);
+	}
+
+	IUserId *copy() const { return new UserIdTUI(*this); }
+
+	UserIdTUI(cstr_t &nick) : nickname(nick) {}
+	std::string nickname;
+};
+
+
+// ============ Helper module ============
+
 class TUIhelper : public IModule {
 public:
 	TUIhelper(IClient *cli, ChatCommand &cmd) :
@@ -170,7 +191,8 @@ public:
 			return;
 		}
 
-		ui = c->addUser(nick);
+		ui = c->addUser(UserIdTUI(nick));
+		ui->nickname = nick;
 		ui->account = UserInstance::UAS_LOGGED_IN;
 
 		getModuleMgr()->onUserJoin(c, ui);

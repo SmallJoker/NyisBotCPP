@@ -226,7 +226,7 @@ std::vector<std::string> Settings::getKeys() const
 	}
 	return keys;
 }
-#include <iostream>
+
 bool Settings::syncFileContents(SyncReason reason)
 {
 	if (m_is_fork)

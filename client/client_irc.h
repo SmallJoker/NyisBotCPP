@@ -4,6 +4,7 @@
 #include "types.h"
 
 class Connection;
+class IFormatter;
 class Logger;
 class ModuleMgr;
 class Network;
@@ -26,6 +27,9 @@ public:
 	void actionNotice(Channel *c, UserInstance *ui, cstr_t &text);
 	void actionJoin(cstr_t &channel);
 	void actionLeave(Channel *c);
+
+	// Module functions: Utilities
+	IFormatter *createFormatter() const;
 
 protected:
 	void processRequest(ClientRequest &cr);

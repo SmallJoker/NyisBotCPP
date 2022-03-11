@@ -6,6 +6,7 @@
 
 class Channel;
 class Connection;
+class IFormatter;
 class Logger;
 class ModuleMgr;
 class Network;
@@ -33,11 +34,15 @@ public:
 
 	virtual void sendRaw(cstr_t &text) {} // TODO: remove this
 
+	// Module functions: Actions
 	virtual void actionSay(Channel *c, cstr_t &text) {}
 	virtual void actionReply(Channel *c, UserInstance *ui, cstr_t &text) {}
 	virtual void actionNotice(Channel *c, UserInstance *ui, cstr_t &text) {}
 	virtual void actionJoin(cstr_t &channel) {}
 	virtual void actionLeave(Channel *c) {}
+
+	// Module functions: Utilities
+	virtual IFormatter *createFormatter() const;
 
 protected:
 	virtual void processRequest(ClientRequest &cr);

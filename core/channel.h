@@ -5,25 +5,37 @@
 #include "utils.h"
 #include <set>
 
-//#include <iostream>
-
 class Channel;
 class IClient;
 class IUserOwner;
+
+// Base class to keep Client-specific data
+
+struct IUserId {
+	virtual ~IUserId() = default;
+
+	virtual bool equals(const IUserId *b) const { return true; }
+	virtual bool matches(cstr_t &what) const { return true; }
+	virtual IUserId *copy() const { return new IUserId(*this); }
+
+protected:
+	IUserId() = default;
+};
+
 
 // This is network-wide
 
 class UserInstance : public Containers {
 public:
-	UserInstance(cstr_t &name);
+	UserInstance(const IUserId &uid);
+	~UserInstance() { delete uid; }
 	int getRefs() const { return m_references; }
 
-	// TODO: add Client-specific UID type
+	IUserId *uid;
 
 	std::string nickname;
+	bool is_bot = false;
 
-	// TODO: Move IRC-specific code
-	std::string hostmask;
 	// Valid for ACC and STATUS
 	enum UserAccStatus {
 		UAS_PENDING = -2,
@@ -58,12 +70,13 @@ public:
 	IUserOwner(IClient *cli);
 	virtual ~IUserOwner();
 
-	UserInstance *addUser(cstr_t &name);
+	UserInstance *addUser(const IUserId &uid);
+	UserInstance *getUser(const IUserId &uid) const;
 	UserInstance *getUser(cstr_t &name) const;
 	bool removeUser(UserInstance *ui);
 	bool contains(UserInstance *ui) const;
 
-	//std::string formatPing(UserInstance *ui) const;
+	IFormatter *createFormatter() const;
 
 	std::set<UserInstance *> &getAllUsers()
 	{ return m_users; }

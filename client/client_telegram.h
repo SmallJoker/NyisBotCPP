@@ -18,12 +18,16 @@ public:
 	void initialize();
 	bool run();
 
+	// Module functions: Actions
 	void sendRaw(cstr_t &text) {}
 	void actionSay(Channel *c, cstr_t &text);
 	void actionReply(Channel *c, UserInstance *ui, cstr_t &text);
 	void actionNotice(Channel *c, UserInstance *ui, cstr_t &text);
 	void actionJoin(cstr_t &channel);
 	void actionLeave(Channel *c);
+
+	// Module functions: Utilities
+	IFormatter *createFormatter() const;
 
 protected:
 	void processRequest(ClientRequest &cr) {}

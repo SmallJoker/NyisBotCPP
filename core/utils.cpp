@@ -1,4 +1,5 @@
 #include "utils.h"
+#include <sstream>
 #include <string.h>
 
 // Shameless copy
@@ -215,4 +216,21 @@ std::string base64decode(const void *data, size_t len)
 		}
 	}
     return result;
+}
+
+IFormatter::IFormatter()
+{
+	m_os = new std::stringstream();
+}
+
+IFormatter::~IFormatter()
+{
+	end(FT_ALL);
+	delete m_os;
+	m_os = nullptr;
+}
+
+std::string IFormatter::str() const
+{
+	return ((std::stringstream *)m_os)->str();
 }

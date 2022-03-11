@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+class UserInstance;
+
 std::string strtrim(const std::string &str);
 std::vector<std::string> strsplit(const std::string &input, char delim = ' ');
 
@@ -38,47 +40,67 @@ std::string base64encode(const void *data, size_t len);
 std::string base64decode(const void *data, size_t len);
 
 
+typedef uint16_t FormatType;
+enum : uint16_t {
+	FT_BOLD    = 0x0001,
+	FT_ITALICS = 0x0002,
+	FT_UNDERL  = 0x0004,
+	FT_COLOR   = 0x0100,
+	FT_ALL     = 0xFFFF
+};
 
-#if 0
-// Design idea.
-// Catch: Does not support other client types.
-
-class FormatHelper {
+class IFormatter {
 public:
-	typedef uint16_t FormatType;
-	enum {
-		FT_BOLD   = 0x0001,
-		FT_ITALIC = 0x0002,
-		FT_ALL    = 0xFFFF
-	};
+	IFormatter();
+	virtual ~IFormatter();
 
-	FormatHelper(std::ostream &os, IClient *type) :
-		m_os(&os)
-	{}
-
-	~FormatHelper()
+	virtual void mention(UserInstance *ui)
 	{
-		end(FT_ALL);
+		*m_os << std::string("(invalid)");
+	}
+
+	void begin(IRC_Color color)
+	{
+		if (m_flags & FT_COLOR)
+			return;
+
+		m_flags |= FT_COLOR;
+		beginImpl(color);
 	}
 
 	void begin(FormatType flags)
 	{
-		flags &= ~m_flags; // Already set
-		if (flags & FT_BOLD) {
-			*m_os << "\x02";
-		}
+		flags &= ~m_flags; // newly set flags
+		flags &= ~FT_COLOR; // disallowed
+		m_flags |= flags;
+
+		beginImpl(flags);
 	}
 
 	void end(FormatType flags)
 	{
-		flags &= m_flags; // Already removed
-		if (flags & FT_BOLD) {
-			*m_os << "\x02";
-		}
+		flags &= m_flags; // newly removed flags
+		m_flags &= ~flags;
+
+		endImpl(flags);
 	}
 
-private:
+	template <typename T>
+	IFormatter &operator<<(const T &what)
+	{
+		*m_os << what;
+		return *this;
+	}
+
+	std::string str() const;
+
+protected:
+	virtual void beginImpl(IRC_Color color) {}
+	virtual void beginImpl(FormatType flags) {}
+	virtual void endImpl(FormatType flags) {}
+
 	std::ostream *m_os;
+
+private:
 	FormatType m_flags;
 };
-#endif

@@ -32,8 +32,6 @@ enum IRC_Color {
 	IC_LIGHT_BLUE, IC_MAGENTA, IC_GRAY,   IC_LIGHT_GRAY
 };
 
-std::string colorize_string(const std::string &str, IRC_Color color);
-
 // Base64 utilities
 
 std::string base64encode(const void *data, size_t len);
@@ -62,7 +60,7 @@ public:
 	void begin(IRC_Color color)
 	{
 		if (m_flags & FT_COLOR)
-			return;
+			endImpl(FT_COLOR);
 
 		m_flags |= FT_COLOR;
 		beginImpl(color);

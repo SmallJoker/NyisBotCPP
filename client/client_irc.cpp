@@ -312,11 +312,13 @@ void ClientIRC::handleClientEvent(cstr_t &status, NetworkEvent *e)
 		if (!c) {
 			c = m_network->addChannel(channel);
 			// Add bot to channel
-			c->addUser(UserIdIRC(m_nickname));
+			UserInstance *ui = c->addUser(UserIdIRC(m_nickname));
+			ui->nickname = m_nickname;
 		}
 
 		// Add newly joined user
 		UserInstance *ui = c->addUser(UserIdIRC(e->nickname));
+		ui->nickname = e->nickname;
 		((UserIdIRC *)ui->uid)->hostmask = e->hostmask;
 		requestAccStatus(ui);
 
@@ -500,7 +502,8 @@ void ClientIRC::handleAuthentication(cstr_t &status, NetworkEvent *e)
 		if (type > 0)
 			m_auth_status = AS_AUTHENTICATE;
 
-		m_network->addUser(UserIdIRC(m_nickname));
+		UserInstance *ui = m_network->addUser(UserIdIRC(m_nickname));
+		ui->nickname = m_nickname;
 		return;
 	}
 	if (status == "396") {
@@ -523,7 +526,8 @@ void ClientIRC::handleServerMessage(cstr_t &status, NetworkEvent *e)
 			if (strchr("~&@%+", name[0]))
 				name = name.substr(1);
 
-			c->addUser(UserIdIRC(name));
+			UserInstance *ui = c->addUser(UserIdIRC(name));
+			ui->nickname = name;
 		}
 		m_module_mgr->onChannelJoin(c);
 		return;

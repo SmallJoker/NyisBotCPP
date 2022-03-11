@@ -142,14 +142,6 @@ void apply_user_modes(char *buf, const std::string &modifier)
 	}
 }
 
-std::string colorize_string(const std::string &str, IRC_Color color)
-{
-	std::string out(str.size() + 2 + 2 + 1, '\0');
-	int len = sprintf(&out[0], "\x03%02i%s\x0F", (int)color, str.c_str());
-	out.resize(len);
-	return out;
-}
-
 // Base64 encoder and decoder by polfosol
 // https://stackoverflow.com/questions/180947/base64-decode-snippet-in-c/37109258#37109258
 

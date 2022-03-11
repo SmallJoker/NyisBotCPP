@@ -20,15 +20,18 @@ struct Card {
 		return color > b.color;
 	}
 
-	static std::string format(const std::vector<Card> &cards)
+	static void format(IFormatter *fmt, const std::vector<Card> &cards)
 	{
-		std::ostringstream ss;
-		ss << "\x0F"; // Normal text + Bold start
-		for (const Card &c : cards)
-			ss << colorize_string("\x02[" + std::string(c.face) + "] ", c.color);
+		fmt->begin(IC_BLACK);
+		fmt->end(FT_COLOR); // Clear previous formatting
+		fmt->begin(FT_BOLD);
 
-		ss << "\x0F"; // Normal text
-		return ss.str();
+		for (const Card &c : cards) {
+			fmt->begin(c.color);
+			*fmt << "[" << std::string(c.face) << "] ";
+		}
+
+		fmt->end(FT_COLOR | FT_BOLD);
 	}
 
 	static size_t findType(cstr_t &type)
@@ -390,15 +393,25 @@ public:
 
 		UnoPlayer *p = g->getPlayer(g->current);
 	
-		std::ostringstream ss;
-		ss << "[UNO] " << g->current->nickname << " (" << p->cards.size() << " cards) - ";
-		ss << "Top card: " << Card::format({ g->top_card });
-		if (g->draw_count > 0)
-			ss << "- draw count: "<< g->draw_count;
+		auto *fmt = c->createFormatter();
+		{
+			*fmt << "[UNO] " ;
+			fmt->mention(g->current);
+			*fmt << " (" << p->cards.size() << " cards) - " << "Top card: ";
+			Card::format(fmt, { g->top_card });
+			if (g->draw_count > 0)
+				*fmt << "- draw count: "<< g->draw_count;
 
-		c->say(ss.str());
+			c->say(fmt->str());
+		}
 
-		c->notice(to_user, "Your cards: " + Card::format(g->getPlayer(to_user)->cards));
+		fmt->clear();
+		{
+			*fmt << "Your cards: ";
+			Card::format(fmt, g->getPlayer(to_user)->cards);
+			c->notice(to_user, fmt->str());
+		}
+		delete fmt;
 	}
 
 	CHATCMD_FUNC(cmd_help)
@@ -629,7 +642,14 @@ public:
 
 		auto drawn = p->drawCards(std::max(1, g->draw_count));
 		g->draw_count = 0;
-		c->notice(ui, "You drew the following cards: " + Card::format(drawn));
+
+		auto *fmt = c->createFormatter();
+		{
+			*fmt << "You drew the following cards: ";
+			Card::format(fmt, drawn);
+			c->notice(ui, fmt->str());
+		}
+		delete fmt;
 
 		g->turnNext();
 		tellGameStatus(c);

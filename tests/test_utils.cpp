@@ -35,9 +35,10 @@ void test_Utils_irc_stuff()
 	apply_user_modes(&buf[0], "-bd");
 	TEST_CHECK(buf == "a c ");
 
-	buf = " colorize me ";
+	// Colorize requires a client instance
+	/*buf = " colorize me ";
 	std::string normal("\x03");
-	TEST_CHECK(colorize_string(buf, IC_LIGHT_GREEN) == normal + "09 colorize me \x0F");
+	TEST_CHECK(colorize_string(buf, IC_LIGHT_GREEN) == normal + "09 colorize me \x0F");*/
 }
 
 void test_Utils_base64()

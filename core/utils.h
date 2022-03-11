@@ -91,6 +91,7 @@ public:
 	}
 
 	std::string str() const;
+	void clear();
 
 protected:
 	virtual void beginImpl(IRC_Color color) {}

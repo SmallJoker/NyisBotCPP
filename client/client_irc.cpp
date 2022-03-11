@@ -37,7 +37,7 @@ class FormatterIRC : public IFormatter {
 public:
 	void mention(UserInstance *ui)
 	{
-		*m_os << std::string("(invalid)");
+		*m_os << ui->nickname;
 	}
 
 	void beginImpl(IRC_Color color)

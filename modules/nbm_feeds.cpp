@@ -160,12 +160,17 @@ public:
 			}
 
 			auto parts = strsplit(link, '/');
-			std::string out;
-			out.append(colorize_string(author, IC_GREEN));
-			out.append(" @").append(colorize_string(parts[3], IC_MAROON)); // @projectname
-			out.append(": ").append(colorize_string(title, IC_LIGHT_GRAY)); // : title
-			c->say(out);
+			// AUTHOR @PROJECTNAME: COMMIT MESSAGE
+			auto *fmt = c->createFormatter();
 
+			fmt->begin(IC_GREEN); *fmt << author; fmt->end(FT_COLOR);
+			*fmt << " @";
+			fmt->begin(IC_MAROON); *fmt << parts[3]; fmt->end(FT_COLOR);
+			*fmt << ": ";
+			fmt->begin(IC_LIGHT_GRAY); *fmt << title; fmt->end(FT_COLOR);
+	
+			c->say(fmt->str());
+			delete fmt;
 		}
 		f->last_update[key] = time_newest;
 

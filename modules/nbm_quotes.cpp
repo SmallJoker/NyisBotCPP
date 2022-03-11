@@ -145,9 +145,13 @@ public:
 		}
 		if (matches.size() == 1) {
 			Quote q;
-			if (m_settings->get(matches[0], &q))
-				c->say(colorize_string("[Quote #" + matches[0] + "] ", IC_ORANGE) + q.text);
-			else
+			if (m_settings->get(matches[0], &q)) {
+				auto *fmt = c->createFormatter();
+				fmt->begin(IC_ORANGE); *fmt << "[Quote #" << matches[0] << "] "; fmt->end(FT_COLOR);
+				*fmt << q.text;
+				c->say(fmt->str());
+				delete fmt;
+			} else
 				c->reply(ui, "Unknown or invalid quote #" + matches[0]);
 			return;
 		}

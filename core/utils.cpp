@@ -226,3 +226,10 @@ std::string IFormatter::str() const
 {
 	return ((std::stringstream *)m_os)->str();
 }
+
+void IFormatter::clear()
+{
+	auto ss = (std::stringstream *)m_os;
+	ss->str("");
+	ss->clear();
+}

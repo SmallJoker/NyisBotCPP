@@ -52,10 +52,7 @@ public:
 	IFormatter();
 	virtual ~IFormatter();
 
-	virtual void mention(UserInstance *ui)
-	{
-		*m_os << std::string("(invalid)");
-	}
+	virtual void mention(UserInstance *ui);
 
 	void begin(IRC_Color color)
 	{

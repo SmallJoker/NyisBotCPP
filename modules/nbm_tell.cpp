@@ -51,7 +51,7 @@ public:
 
 	void onStep(float time)
 	{
-		thread_local static float cleanup_tick = 0;
+		thread_local static float cleanup_tick = 9999;
 		for (auto it = m_cooldown.begin(); it != m_cooldown.end();){
 			it->second -= time;
 			if (it->second <= 0.0f)
@@ -65,13 +65,13 @@ public:
 		if (cleanup_tick > 3600.0f) {
 			cleanup_tick = 0;
 
-			long long now = std::time(nullptr);
+			int64_t now = std::time(nullptr);
 			auto keys = m_settings->getKeys();
 			for (cstr_t &key : keys) {
 				TellRecord tr;
 				if (m_settings->get(key, &tr)) {
 					if (now - tr.timestamp < EXPIRY_TIME)
-						continue;
+						continue; // Keep
 				}
 				// Invalid key
 				m_settings->remove(key);
@@ -115,7 +115,7 @@ public:
 	CHATCMD_FUNC(cmd_tell)
 	{
 		if (m_cooldown.find(ui) != m_cooldown.end()) {
-			c->reply(ui, "Please wait a bit before adding a new quote.");
+			c->reply(ui, "Please wait a bit before leaving another message.");
 			return;
 		}
 	

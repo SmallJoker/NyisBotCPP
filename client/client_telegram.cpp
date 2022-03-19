@@ -10,20 +10,20 @@
 
 // ============ User ID ============
 
-struct UserIdTelegram : IUserId {
-	bool equals(const IUserId *b) const
-	{
-		return user_id == ((UserIdTelegram *)b)->user_id;
-	}
-	bool matches(cstr_t &what) const
-	{
-		// TODO: Is this correct?
-		return std::to_string(user_id) == what;
-	}
-
-	IUserId *copy() const { return new UserIdTelegram(*this); }
-
+struct UserIdTelegram : IImplId {
 	UserIdTelegram(int64_t id) : user_id(id) {}
+	IImplId *copy(void *parent) const { return new UserIdTelegram(user_id); }
+
+	bool is(const IImplId *other) const
+	{
+		return user_id == ((UserIdTelegram *)other)->user_id;
+	}
+
+	std::string str() const
+	{
+		return std::to_string(user_id);
+	}
+
 	int64_t user_id;
 };
 
@@ -35,7 +35,7 @@ public:
 	void mention(UserInstance *ui)
 	{
 		*m_os << "[" << ui->nickname << "](tg://user?id="
-			<< ((UserIdTelegram *)ui->uid)->user_id << ")";
+			<< ui->uid->str() << ")";
 	}
 
 	void beginImpl(IRC_Color color)

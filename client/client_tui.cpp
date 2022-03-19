@@ -12,20 +12,22 @@
 
 // ============ User ID ============
 
-struct UserIdTUI : IUserId {
-	bool equals(const IUserId *b) const
+struct UserIdTUI : IImplId {
+	UserIdTUI(cstr_t &nick) : nickptr(&nick) {}
+
+	IImplId *copy(void *parent) const
 	{
-		return nickname == ((UserIdTUI *)b)->nickname;
-	}
-	bool matches(cstr_t &what) const
-	{
-		return strequalsi(nickname, what);
+		UserInstance *ui = (UserInstance *)parent;
+		ui->nickname = *nickptr;
+		return new UserIdTUI(ui->nickname);
 	}
 
-	IUserId *copy() const { return new UserIdTUI(*this); }
+	bool is(const IImplId *other) const
+	{ return *nickptr == *((UserIdTUI *)other)->nickptr; }
 
-	UserIdTUI(cstr_t &nick) : nickname(nick) {}
-	std::string nickname;
+	std::string str() const { return *nickptr; }
+
+	const std::string *nickptr;
 };
 
 

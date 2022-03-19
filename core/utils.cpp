@@ -1,4 +1,5 @@
 #include "utils.h"
+#include "channel.h"
 #include <sstream>
 #include <string.h>
 
@@ -220,6 +221,11 @@ IFormatter::~IFormatter()
 	end(FT_ALL);
 	delete m_os;
 	m_os = nullptr;
+}
+
+void IFormatter::mention(UserInstance *ui)
+{
+	*m_os << ui->uid->str();
 }
 
 std::string IFormatter::str() const

@@ -11,15 +11,19 @@ class IUserOwner;
 
 // Base class to keep Client-specific data
 
-struct IUserId {
-	virtual ~IUserId() = default;
+struct IImplId {
+	virtual ~IImplId() = default;
+	// Manual copy
+	virtual IImplId *copy(void *parent) const = 0;
 
-	virtual bool equals(const IUserId *b) const { return true; }
-	virtual bool matches(cstr_t &what) const { return true; }
-	virtual IUserId *copy() const { return new IUserId(*this); }
+	// ID comparison
+	virtual bool is(const IImplId *other) const = 0;
+
+	// For IFormatter
+	virtual std::string str() const = 0;
 
 protected:
-	IUserId() = default;
+	IImplId() = default;
 };
 
 
@@ -27,11 +31,12 @@ protected:
 
 class UserInstance : public Containers {
 public:
-	UserInstance(const IUserId &uid);
+	UserInstance(const IImplId &uid);
 	~UserInstance() { delete uid; }
+
 	int getRefs() const { return m_references; }
 
-	IUserId *uid;
+	IImplId *uid;
 
 	std::string nickname;
 	bool is_bot = false;
@@ -70,15 +75,15 @@ public:
 	IUserOwner(IClient *cli);
 	virtual ~IUserOwner();
 
-	UserInstance *addUser(const IUserId &uid);
-	UserInstance *getUser(const IUserId &uid) const;
+	UserInstance *addUser(const IImplId &uid);
+	UserInstance *getUser(const IImplId &uid) const;
 	UserInstance *getUser(cstr_t &name) const;
 	bool removeUser(UserInstance *ui);
 	bool contains(UserInstance *ui) const;
 
 	IFormatter *createFormatter() const;
 
-	std::set<UserInstance *> &getAllUsers()
+	const std::set<UserInstance *> &getAllUsers() const
 	{ return m_users; }
 
 protected:

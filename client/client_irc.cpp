@@ -13,20 +13,22 @@
 
 // ============ User ID ============
 
-struct UserIdIRC : IUserId {
-	bool equals(const IUserId *b) const
+struct UserIdIRC : IImplId {
+	UserIdIRC(cstr_t &nick) : nickptr(&nick) {}
+
+	IImplId *copy(void *parent) const
 	{
-		return nickname == ((UserIdIRC *)b)->nickname;
-	}
-	bool matches(cstr_t &what) const
-	{
-		return strequalsi(nickname, what);
+		UserInstance *ui = (UserInstance *)parent;
+		ui->nickname = *nickptr;
+		return new UserIdIRC(ui->nickname);
 	}
 
-	IUserId *copy() const { return new UserIdIRC(*this); }
+	bool is(const IImplId *other) const
+	{ return *nickptr == *((UserIdIRC *)other)->nickptr; }
 
-	UserIdIRC(cstr_t &nick) : nickname(nick) {}
-	std::string nickname;
+	std::string str() const { return *nickptr; }
+
+	const std::string *nickptr;
 	std::string hostmask;
 };
 
@@ -35,11 +37,6 @@ struct UserIdIRC : IUserId {
 
 class FormatterIRC : public IFormatter {
 public:
-	void mention(UserInstance *ui)
-	{
-		*m_os << ui->nickname;
-	}
-
 	void beginImpl(IRC_Color color)
 	{
 		*m_os << "\x03";
@@ -312,13 +309,11 @@ void ClientIRC::handleClientEvent(cstr_t &status, NetworkEvent *e)
 		if (!c) {
 			c = m_network->addChannel(channel);
 			// Add bot to channel
-			UserInstance *ui = c->addUser(UserIdIRC(m_nickname));
-			ui->nickname = m_nickname;
+			c->addUser(UserIdIRC(m_nickname));
 		}
 
 		// Add newly joined user
 		UserInstance *ui = c->addUser(UserIdIRC(e->nickname));
-		ui->nickname = e->nickname;
 		((UserIdIRC *)ui->uid)->hostmask = e->hostmask;
 		requestAccStatus(ui);
 
@@ -360,7 +355,6 @@ void ClientIRC::handleClientEvent(cstr_t &status, NetworkEvent *e)
 	if (status == "NICK") {
 		// nick!host NICK :NewNickname
 		UserInstance *ui = m_network->getUser(UserIdIRC(e->nickname));
-		((UserIdIRC *)ui->uid)->nickname = e->text;
 		ui->nickname = e->text;
 		requestAccStatus(ui);
 
@@ -502,8 +496,7 @@ void ClientIRC::handleAuthentication(cstr_t &status, NetworkEvent *e)
 		if (type > 0)
 			m_auth_status = AS_AUTHENTICATE;
 
-		UserInstance *ui = m_network->addUser(UserIdIRC(m_nickname));
-		ui->nickname = m_nickname;
+		m_network->addUser(UserIdIRC(m_nickname));
 		return;
 	}
 	if (status == "396") {
@@ -526,8 +519,7 @@ void ClientIRC::handleServerMessage(cstr_t &status, NetworkEvent *e)
 			if (strchr("~&@%+", name[0]))
 				name = name.substr(1);
 
-			UserInstance *ui = c->addUser(UserIdIRC(name));
-			ui->nickname = name;
+			c->addUser(UserIdIRC(name));
 		}
 		m_module_mgr->onChannelJoin(c);
 		return;

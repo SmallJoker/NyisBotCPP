@@ -7,6 +7,7 @@
 class Channel;
 class Connection;
 class IFormatter;
+class IUserOwner;
 class Logger;
 class ModuleMgr;
 class Network;
@@ -41,8 +42,9 @@ public:
 	virtual void actionJoin(cstr_t &channel) {}
 	virtual void actionLeave(Channel *c) {}
 
-	// Module functions: Utilities
+	// Backend specific code
 	virtual IFormatter *createFormatter() const;
+	virtual UserInstance *findUser(const IUserOwner *iuo, cstr_t &name);
 
 protected:
 	virtual void processRequest(ClientRequest &cr);

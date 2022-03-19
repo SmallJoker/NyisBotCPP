@@ -28,20 +28,22 @@ struct RefContainer : public IContainer {
 	~RefContainer() { instances--; }
 };
 
-struct UserIdTest : IUserId {
-	bool equals(const IUserId *b) const
+struct UserIdTest : IImplId {
+	UserIdTest(cstr_t &nick) : nickptr(&nick) {}
+
+	IImplId *copy(void *parent) const
 	{
-		return nickname == ((UserIdTest *)b)->nickname;
-	}
-	bool matches(cstr_t &what) const
-	{
-		return strequalsi(nickname, what);
+		UserInstance *ui = (UserInstance *)parent;
+		ui->nickname = *nickptr;
+		return new UserIdTest(ui->nickname);
 	}
 
-	IUserId *copy() const { return new UserIdTest(*this); }
+	bool is(const IImplId *other) const
+	{ return *nickptr == *((UserIdTest *)other)->nickptr; }
 
-	UserIdTest(cstr_t &nick) : nickname(nick) {}
-	std::string nickname;
+	std::string str() const { return *nickptr; }
+
+	const std::string *nickptr;
 };
 
 void test_Network_Channel_UserInstance()

@@ -6,10 +6,10 @@
 
 // ================= UserInstance =================
 
-UserInstance::UserInstance(const IUserId &uid) :
-	uid(uid.copy())
+UserInstance::UserInstance(const IImplId &uid)
 {
 	this->nickname = "(nickname)";
+	this->uid = uid.copy(this);
 }
 
 
@@ -31,7 +31,7 @@ IUserOwner::~IUserOwner()
 	m_users.clear();
 }
 
-UserInstance *IUserOwner::addUser(const IUserId &uid)
+UserInstance *IUserOwner::addUser(const IImplId &uid)
 {
 	UserInstance *ui = getUser(uid);
 
@@ -49,10 +49,10 @@ UserInstance *IUserOwner::addUser(const IUserId &uid)
 	return ui;
 }
 
-UserInstance *IUserOwner::getUser(const IUserId &uid) const
+UserInstance *IUserOwner::getUser(const IImplId &uid) const
 {
 	for (UserInstance *ui : m_users) {
-		if (uid.equals(ui->uid))
+		if (uid.is(ui->uid))
 			return ui;
 	}
 	return nullptr;
@@ -60,13 +60,7 @@ UserInstance *IUserOwner::getUser(const IUserId &uid) const
 
 UserInstance *IUserOwner::getUser(cstr_t &name) const
 {
-	for (UserInstance *ui : m_users) {
-		if (strequalsi(ui->nickname, name))
-			return ui;
-		if (ui->uid->matches(name))
-			return ui;
-	}
-	return nullptr;
+	return m_client->findUser(this, name);
 }
 
 bool IUserOwner::removeUser(UserInstance *ui)

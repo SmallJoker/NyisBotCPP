@@ -29,6 +29,16 @@ IFormatter *IClient::createFormatter() const
 	return new IFormatter();
 }
 
+UserInstance *IClient::findUser(const IUserOwner *iuo, cstr_t &name)
+{
+	for (UserInstance *ui : iuo->getAllUsers()) {
+		if (strequalsi(ui->nickname, name))
+			return ui;
+	}
+	return nullptr;
+}
+
+
 void IClient::addRequest(ClientRequest && cr)
 {
 	m_requests_lock.lock();

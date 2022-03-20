@@ -13,22 +13,31 @@
 static const char STATUSUPDATE = '\0';
 
 struct Card {
+	struct Suit {
+		IRC_Color color;
+		const char *letter;
+		bool operator==(const Suit &other) { return letter == other.letter; }
+		bool operator!=(const Suit &other) { return letter != other.letter; }
+	};
+
 	bool operator<(const Card &b)
 	{
-		if (color == b.color)
+		if (suit.color == b.suit.color)
 			return strcmp(face, b.face) > 0;
-		return color > b.color;
+		return suit.color > b.suit.color;
 	}
 
 	static void format(IFormatter *fmt, const std::vector<Card> &cards)
 	{
 		fmt->begin(IC_BLACK);
 		fmt->end(FT_COLOR); // Clear previous formatting
-		fmt->begin(FT_BOLD);
 
 		for (const Card &c : cards) {
-			fmt->begin(c.color);
-			*fmt << "[" << std::string(c.face) << "] ";
+			fmt->begin(c.suit.color);
+			*fmt << c.suit.letter;
+			fmt->begin(FT_BOLD);
+			*fmt << "[" << c.face << "] ";
+			fmt->end(FT_BOLD);
 		}
 
 		fmt->end(FT_COLOR | FT_BOLD);
@@ -44,20 +53,35 @@ struct Card {
 		return i;
 	}
 
-	IRC_Color color = IC_BLACK;
+	Suit suit = SUITS[0];
 	const char *face = nullptr;
 
 	static const size_t FACES_MAX = 15;
 	static const char *FACES[];
-	static const size_t COLORS_MAX = 5;
-	static const IRC_Color COLORS[];  // IRC colors
+
+	enum {
+		S_BLACK = 0,
+		S_RED,
+		S_GREEN,
+		S_BLUE,
+		S_YELLOW
+	};
+	static const std::vector<Suit> SUITS;  // IRC colors
 };
 
 const char *Card::FACES[Card::FACES_MAX] = {
 	"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "D2", "R", "S", "W", "WD4"
 };
 
-const IRC_Color Card::COLORS[Card::COLORS_MAX] = { IC_BLACK, IC_RED, IC_GREEN, IC_BLUE, IC_YELLOW };
+const std::vector<Card::Suit> Card::SUITS = {
+	{ IC_BLACK,  "" },
+	{ IC_RED,    "r" },
+	{ IC_GREEN , "g" },
+	{ IC_BLUE,   "b" },
+	{ IC_YELLOW, "y" }
+};
+
+constexpr size_t UNO_MIN_PLAYERS = true ? 2 : 1; // Debug mode
 
 class UnoPlayer : public IContainer, public SettingType {
 public:
@@ -88,21 +112,22 @@ public:
 		std::vector<Card> drawn;
 
 		while (count > 0) {
-			IRC_Color  color = Card::COLORS[get_random() % Card::COLORS_MAX];
+			Card::Suit  suit = Card::SUITS[get_random() % Card::SUITS.size()];
 			const char *face = Card::FACES[get_random() % Card::FACES_MAX];
 
 			if (strchr(face, 'W')) {
-				color = IC_BLACK; // must be black
+				suit = Card::SUITS[Card::S_BLACK]; // must be black
 
 				if (max_special == 0)
 					continue; // Retry
 				max_special--;
-			} else if (color == IC_BLACK) {
-				continue; // Retry
+			} else if (suit.color == IC_BLACK) {
+				// Retry if black
+				continue;
 			}
 
 			drawn.emplace_back(Card {
-				.color = color,
+				.suit = suit,
 				.face = face
 			});
 			count--;
@@ -144,7 +169,7 @@ public:
 
 			p->m_elo += (int)delta;
 			p->m_streak = 0;
-			if (players.size() == MIN_PLAYERS) {
+			if (players.size() == UNO_MIN_PLAYERS) {
 				// Only for last man standing
 				p->m_losses++;
 			}
@@ -173,7 +198,6 @@ public:
 	{ return m_elo; }
 
 	std::vector<Card> cards;
-	static const size_t MIN_PLAYERS = true ? 2 : 1; // Debug mode
 private:
 	static const int GAIN_FACTOR = 20;
 	int64_t m_wins = 0,
@@ -188,7 +212,7 @@ public:
 	std::string dump() const { return "UnoGame"; }
 
 	UnoGame(Channel *c, ChatCommand *cmd, Settings *s) :
-		GameF_internal(c, cmd, 2), m_settings(s)
+		GameF_internal(c, cmd, UNO_MIN_PLAYERS), m_settings(s)
 	{
 		// Default: 0x8F
 		modes = UM_RANKED | UM_WD4_REV | UM_UPGRADE | UM_STACK_WD4 | UM_STACK_D2;
@@ -366,7 +390,7 @@ public:
 		UnoGame *g = getGame(c);
 		if (!g)
 			return false;
-		if (g->getPlayerCount() >= UnoPlayer::MIN_PLAYERS)
+		if (g->getPlayerCount() >= g->MIN_PLAYERS)
 			return true;
 
 		if (g->has_started) {
@@ -522,7 +546,7 @@ public:
 		UnoPlayer *p = g->getPlayer(ui);
 
 		std::string color_s(get_next_part(msg));
-		IRC_Color color_e = IC_BLACK;
+		Card::Suit suit_e = Card::SUITS[Card::S_BLACK];
 		std::string face_s(get_next_part(msg));
 
 		if (color_s.size() >= 2) {
@@ -536,21 +560,21 @@ public:
 
 		// Convert text colors to IRC Colors
 		switch (toupper(color_s[0])) {
-			case 'R': color_e = IC_RED;    break;
-			case 'G': color_e = IC_GREEN;  break;
-			case 'B': color_e = IC_BLUE;   break;
-			case 'Y': color_e = IC_YELLOW; break;
+			case 'R': suit_e = Card::SUITS[Card::S_RED];    break;
+			case 'G': suit_e = Card::SUITS[Card::S_GREEN];  break;
+			case 'B': suit_e = Card::SUITS[Card::S_BLUE];   break;
+			case 'Y': suit_e = Card::SUITS[Card::S_YELLOW]; break;
 		}
 		bool change_face = face_s.find('W') != std::string::npos;
 		size_t face_index = Card::findType(face_s);
 
-		if (color_e == IC_BLACK || face_index == Card::FACES_MAX) {
+		if (suit_e.color == IC_BLACK || face_index == Card::FACES_MAX) {
 			c->notice(ui, "Invalid input. Syntax: $uno p <color> <face>, $p <color><face>.");
 			return;
 		}
 
 		// Check whether color of face matches
-		if (color_e != g->top_card.color && face_s != g->top_card.face
+		if (suit_e != g->top_card.suit && face_s != g->top_card.face
 				&& !change_face) {
 
 			c->notice(ui, "This card cannot be played. Please check color and face.");
@@ -558,7 +582,7 @@ public:
 		}
 
 		auto it = std::find_if(p->cards.begin(), p->cards.end(), [=] (auto &a) {
-			return a.face == face_s && (change_face || a.color == color_e);
+			return a.face == face_s && (change_face || a.suit == suit_e);
 		});
 
 		if (it == p->cards.end()) {
@@ -593,7 +617,7 @@ public:
 
 		// All OK. Put the card on top
 		g->top_card = Card {
-			.color = color_e,
+			.suit = suit_e,
 			.face = Card::FACES[face_index]
 		};
 		p->cards.erase(it);

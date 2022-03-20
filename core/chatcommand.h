@@ -24,6 +24,7 @@ public:
 	void         add(cstr_t &subcmd, ChatCommandAction action, IModule *module = nullptr);
 	ChatCommand &add(cstr_t &subcmd, IModule *module = nullptr);
 	void remove(IModule *module);
+	void move(const IModule *old_module, IModule *new_module);
 
 	void setScope(Channel *c, const UserInstance *ui);
 	void resetScope(Channel *c, const UserInstance *ui);

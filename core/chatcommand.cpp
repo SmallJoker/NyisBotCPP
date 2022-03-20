@@ -33,7 +33,7 @@ ChatCommand &ChatCommand::add(cstr_t &subcmd, IModule *module)
 
 	if (!is_new) {
 		WARN("Overriding command " << subcmd << "!");
-		m_subs.clear();
+		it->second.m_subs.clear();
 	}
 
 	return it->second;
@@ -54,6 +54,15 @@ void ChatCommand::remove(IModule *module)
 		m_action = nullptr;
 	}
 	// IMPORTANT: Also clean up setScope() !
+}
+
+void ChatCommand::move(const IModule *old_module, IModule *new_module)
+{
+	for (auto it : m_subs)
+		it.second.move(old_module, new_module);
+
+	if (m_module == old_module)
+		m_module = new_module;
 }
 
 void ChatCommand::setScope(Channel *c, const UserInstance *ui)

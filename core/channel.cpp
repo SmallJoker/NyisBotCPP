@@ -142,13 +142,13 @@ void Channel::leave()
 
 Network::~Network()
 {
-	for (UserInstance *ui : m_users)
-		delete ui;
-	m_users.clear();
-
 	for (Channel *c : m_channels)
 		delete c;
 	m_channels.clear();
+
+	for (UserInstance *ui : m_users)
+		delete ui;
+	m_users.clear();
 }
 
 Channel *Network::addChannel(cstr_t &name)

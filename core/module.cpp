@@ -99,7 +99,7 @@ ModuleMgr::~ModuleMgr()
 
 bool ModuleMgr::loadModules()
 {
-	MutexLockR _(m_lock);
+	MutexLock _(m_lock);
 	if (!m_modules.empty())
 		return false;
 
@@ -184,6 +184,8 @@ bool ModuleMgr::reloadModule(std::string name, bool keep_data)
 
 		for (Channel *c : net->getAllChannels())
 			c->getContainers()->move(expired_ptr, mi->module);
+
+		m_commands->move(expired_ptr, mi->module);
 	}
 
 	m_lock.unlock();
@@ -192,7 +194,7 @@ bool ModuleMgr::reloadModule(std::string name, bool keep_data)
 
 void ModuleMgr::unloadModules()
 {
-	MutexLockR _(m_lock);
+	MutexLock _(m_lock);
 	if (m_modules.empty())
 		return;
 
@@ -241,9 +243,12 @@ void ModuleMgr::unloadSingleModule(ModuleInternal *mi, bool keep_data)
 		for (Channel *c : net->getAllChannels())
 			m_commands->resetScope(c, nullptr);
 	}
-	m_commands->remove(mi->module);
 
 	mi->unload(keep_data ? nullptr : net);
+
+	if (!keep_data) {
+		m_commands->remove(mi->module);
+	}
 }
 
 Settings *ModuleMgr::getSettings(IModule *module) const
@@ -274,7 +279,7 @@ Settings *ModuleMgr::getGlobalSettings() const
 
 void ModuleMgr::onStep(float time)
 {
-	MutexLockR _(m_lock);
+	MutexLock _(m_lock);
 
 	auto time_now = std::chrono::high_resolution_clock::now();
 	// Allow custom intervals
@@ -310,42 +315,42 @@ void ModuleMgr::onStep(float time)
 
 void ModuleMgr::onChannelJoin(Channel *c)
 {
-	MutexLockR _(m_lock);
+	MutexLock _(m_lock);
 	for (ModuleInternal *mi : m_modules)
 		mi->module->onChannelJoin(c);
 }
 
 void ModuleMgr::onChannelLeave(Channel *c)
 {
-	MutexLockR _(m_lock);
+	MutexLock _(m_lock);
 	for (ModuleInternal *mi : m_modules)
 		mi->module->onChannelLeave(c);
 }
 
 void ModuleMgr::onUserJoin(Channel *c, UserInstance *ui)
 {
-	MutexLockR _(m_lock);
+	MutexLock _(m_lock);
 	for (ModuleInternal *mi : m_modules)
 		mi->module->onUserJoin(c, ui);
 }
 
 void ModuleMgr::onUserLeave(Channel *c, UserInstance *ui)
 {
-	MutexLockR _(m_lock);
+	MutexLock _(m_lock);
 	for (ModuleInternal *mi : m_modules)
 		mi->module->onUserLeave(c, ui);
 }
 
 void ModuleMgr::onUserRename(UserInstance *ui, cstr_t &old_name)
 {
-	MutexLockR _(m_lock);
+	MutexLock _(m_lock);
 	for (ModuleInternal *mi : m_modules)
 		mi->module->onUserRename(ui, old_name);
 }
 
 bool ModuleMgr::onUserSay(Channel *c, UserInstance *ui, std::string &msg)
 {
-	MutexLockR _(m_lock);
+	MutexLock _(m_lock);
 
 	std::string backup(msg);
 	if (m_commands->run(c, ui, msg))
@@ -363,7 +368,7 @@ bool ModuleMgr::onUserSay(Channel *c, UserInstance *ui, std::string &msg)
 
 void ModuleMgr::onUserStatusUpdate(UserInstance *ui, bool is_timeout)
 {
-	MutexLockR _(m_lock);
+	MutexLock _(m_lock);
 	m_status_update_timeout.erase(ui);
 	for (ModuleInternal *mi : m_modules)
 		mi->module->onUserStatusUpdate(ui, is_timeout);

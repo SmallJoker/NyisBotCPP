@@ -98,7 +98,7 @@ void Settings::sanitizeKey(std::string &key)
 	std::string blacklist(key.size(), '\0');
 	size_t b = 0, k = 0;
 	for (size_t i = 0; i < key.size(); ++i) {
-		if (!isKeyCharValid(key[i]) || key[i] == '.')
+		if (!isKeyCharValid(key[i]))
 			blacklist[b++] = key[i];
 		else
 			key[k++] = key[i];

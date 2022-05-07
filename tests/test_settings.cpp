@@ -186,7 +186,7 @@ void test_SettingType_util()
 
 	Settings::sanitizeKey(text);
 	auto parts = strsplit(text, '_');
-	TEST_CHECK(parts[0] == "2903C0FFEE155E1");
+	TEST_CHECK(parts[0] == "2903C0FFEE1.55E1");
 	TEST_CHECK(parts[1].size() == 8);
 
 	{
@@ -196,9 +196,9 @@ void test_SettingType_util()
 	}
 
 	// Base64 data
+	text = "2903 C0FFEE 1.55E1 ";
 	std::string base64(base64encode(text.c_str(), text.size()));
 	TEST_CHECK(base64 == "MjkwMyBDMEZGRUUgMS41NUUxIA==");
-	TEST_CHECK(Settings::isKeyValid(base64) == true);
 }
 
 void test_Settings(Unittest *ut)

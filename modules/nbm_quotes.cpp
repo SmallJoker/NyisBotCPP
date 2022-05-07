@@ -98,11 +98,9 @@ public:
 		}
 
 		std::string id(std::to_string(m_last_id));
-		std::string nickname = ui->nickname;
-		Settings::sanitizeKey(nickname);
 
 		Quote q;
-		q.writer = nickname;
+		q.writer = ui->nickname;
 		q.text = msg;
 		m_settings->set(id, &q);
 		m_settings->set("id", id);

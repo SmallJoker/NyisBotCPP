@@ -225,7 +225,7 @@ IFormatter::~IFormatter()
 
 void IFormatter::mention(UserInstance *ui)
 {
-	*m_os << ui->uid->str();
+	*m_os << ui->uid->nameStr();
 }
 
 std::string IFormatter::str() const

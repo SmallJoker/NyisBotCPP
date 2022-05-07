@@ -4,6 +4,7 @@
 bin/
 build/
 *.kdev4
+*.kate-swp
 
 config/
 debug.txt

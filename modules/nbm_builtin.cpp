@@ -63,9 +63,9 @@ public:
 				continue;
 
 			if (bc->remember_text.empty())
-				m_settings->remove(ui->nickname);
+				m_settings->remove(ui->uid->idStr());
 			else
-				m_settings->set(ui->nickname, bc->remember_text);
+				m_settings->set(ui->uid->idStr(), bc->remember_text);
 		}
 
 		m_settings->syncFileContents(SR_WRITE);

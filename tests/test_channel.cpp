@@ -2,6 +2,7 @@
 #include "test.h"
 #include "../core/channel.h"
 #include "../core/client.h"
+#include "../core/iimpl_basic.h"
 #include "../core/logger.h"
 #include "../core/settings.h"
 #include "../core/utils.h"
@@ -28,40 +29,22 @@ struct RefContainer : public IContainer {
 	~RefContainer() { instances--; }
 };
 
-struct UserIdTest : IImplId {
-	UserIdTest(cstr_t &nick) : nickptr(&nick) {}
-
-	IImplId *copy(void *parent) const
-	{
-		UserInstance *ui = (UserInstance *)parent;
-		ui->nickname = *nickptr;
-		return new UserIdTest(ui->nickname);
-	}
-
-	bool is(const IImplId *other) const
-	{ return *nickptr == *((UserIdTest *)other)->nickptr; }
-
-	std::string str() const { return *nickptr; }
-
-	const std::string *nickptr;
-};
-
 void test_Network_Channel_UserInstance()
 {
 	Network &n = *client->getNetwork();
 
-	Channel *c = n.addChannel("#foobar");
-	TEST_CHECK(c != nullptr && c->getName() == "#foobar");
-	TEST_CHECK(n.addChannel("#foobar") == c);
+	Channel *c = n.addChannel(false, ChannelIdBasic("#foobar"));
+	TEST_CHECK(c != nullptr && c->cid->nameStr() == "#foobar");
+	TEST_CHECK(n.addChannel(false, ChannelIdBasic("#foobar")) == c);
 
 	instances = 0;
 	{
-		UserInstance *ui_d = c->addUser(UserIdTest("Donald"));
-		TEST_CHECK(c->addUser(UserIdTest("Donald")) == ui_d);
+		UserInstance *ui_d = c->addUser(UserIdBasic("Donald"));
+		TEST_CHECK(c->addUser(UserIdBasic("Donald")) == ui_d);
 		ui_d->set(nullptr, new RefContainer());
 
 		TEST_CHECK(c->getUser("Mickey") == nullptr);
-		UserInstance *ui_m = c->addUser(UserIdTest("Mickey"));
+		UserInstance *ui_m = c->addUser(UserIdBasic("Mickey"));
 		TEST_CHECK(c->getUser("miCKey") == ui_m);
 		ui_m->set(nullptr, new RefContainer());
 

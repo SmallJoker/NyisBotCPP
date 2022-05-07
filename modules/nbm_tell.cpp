@@ -86,6 +86,7 @@ public:
 		for (cstr_t &key : keys) {
 			TellRecord tr;
 			if (m_settings->get(key, &tr)) {
+				// TODO: User ID parsing?
 				if (!strequalsi(tr.nick_dst, ui->nickname))
 					continue;
 

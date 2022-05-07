@@ -2,6 +2,7 @@
 #include "chatcommand.h"
 #include "connection.h"
 #include "channel.h"
+#include "iimpl_basic.h"
 #include "logger.h"
 #include "module.h"
 #include "settings.h"
@@ -10,25 +11,9 @@
 #include <sstream>
 #include <string.h>
 
-// ============ User ID ============
+typedef UserIdBasic UserIdTUI;
+typedef ChannelIdBasic ChannelIdTUI;
 
-struct UserIdTUI : IImplId {
-	UserIdTUI(cstr_t &nick) : nickptr(&nick) {}
-
-	IImplId *copy(void *parent) const
-	{
-		UserInstance *ui = (UserInstance *)parent;
-		ui->nickname = *nickptr;
-		return new UserIdTUI(ui->nickname);
-	}
-
-	bool is(const IImplId *other) const
-	{ return *nickptr == *((UserIdTUI *)other)->nickptr; }
-
-	std::string str() const { return *nickptr; }
-
-	const std::string *nickptr;
-};
 
 
 // ============ Helper module ============
@@ -129,7 +114,7 @@ public:
 		ss << "List of channels: " << std::endl;
 		for (Channel *c : all) {
 			snprintf(buf, BUFSIZE, "\t[%s] : %zu users, %zu containers",
-				c->getName().c_str(), c->getAllUsers().size(), c->getContainers()->size());
+				c->cid->idStr().c_str(), c->getAllUsers().size(), c->getContainers()->size());
 			ss << buf << std::endl;
 		}
 		sendRaw(ss.str());
@@ -147,22 +132,22 @@ public:
 
 	CHATCMD_FUNC(cmd_channel_remove)
 	{
-		std::string name(get_next_part(msg));
-		c = getNetwork()->getChannel(name);
-		if (!c) {
+		ChannelIdTUI cid(get_next_part(msg));
+		Channel *c2 = getNetwork()->getChannel(cid);
+		if (!c2) {
 			sendRaw("Channel not found");
 			cmd_channel_list(c, ui, msg);
 			return;
 		}
-		m_client->actionLeave(c);
+		m_client->actionLeave(c2);
 	}
 
 	CHATCMD_FUNC(cmd_user_list)
 	{
-		std::string channel(get_next_part(msg));
+		ChannelIdTUI cid(get_next_part(msg));
 		IUserOwner *where = getNetwork();
-		if (!channel.empty()) {
-			where = getNetwork()->getChannel(channel);
+		if (!cid.name.empty()) {
+			where = getNetwork()->getChannel(cid);
 			if (!where) {
 				sendRaw("Channel not found");
 				cmd_channel_list(c, ui, msg);
@@ -176,7 +161,7 @@ public:
 		ss << "List of users: " << std::endl;
 		for (UserInstance *ui : all) {
 			snprintf(buf, BUFSIZE, "\t[%s] : %zu containers",
-				ui->nickname.c_str(), ui->size());
+				ui->uid->nameStr().c_str(), ui->size());
 			ss << buf << std::endl;
 		}
 		sendRaw(ss.str());
@@ -185,8 +170,8 @@ public:
 	CHATCMD_FUNC(cmd_user_add)
 	{
 		std::string nick(get_next_part(msg));
-		std::string channel(get_next_part(msg));
-		c = getNetwork()->getChannel(channel);
+		ChannelIdTUI cid(get_next_part(msg));
+		c = getNetwork()->getChannel(cid);
 		if (!c) {
 			sendRaw("Channel not found");
 			cmd_channel_list(c, ui, msg);
@@ -203,8 +188,8 @@ public:
 	CHATCMD_FUNC(cmd_user_remove)
 	{
 		std::string nick(get_next_part(msg));
-		std::string channel(get_next_part(msg));
-		c = getNetwork()->getChannel(channel);
+		ChannelIdTUI cid(get_next_part(msg));
+		c = getNetwork()->getChannel(cid);
 		if (!c) {
 			sendRaw("Channel not found");
 			cmd_channel_list(c, ui, msg);
@@ -223,8 +208,8 @@ public:
 	CHATCMD_FUNC(cmd_user_say)
 	{
 		std::string nick(get_next_part(msg));
-		std::string channel(get_next_part(msg));
-		c = getNetwork()->getChannel(channel);
+		ChannelIdTUI cid(get_next_part(msg));
+		c = getNetwork()->getChannel(cid);
 		if (!c) {
 			sendRaw("Channel not found");
 			cmd_channel_list(c, ui, msg);
@@ -238,7 +223,7 @@ public:
 		}
 		msg = strtrim(msg);
 
-		LoggerAssistant(LL_VERBOSE, nullptr) << "Channel [" << c->getName() << "] " << ui->nickname << ": " << msg;
+		LoggerAssistant(LL_VERBOSE, nullptr) << "Channel [" << c->cid->nameStr() << "] " << ui->nickname << ": " << msg;
 		if (!getModuleMgr()->onUserSay(c, ui, msg))
 			sendRaw("Message was not maked as handled.");
 	}
@@ -300,29 +285,29 @@ void ClientTUI::sendRaw(cstr_t &text)
 
 void ClientTUI::actionSay(Channel *c, cstr_t &text)
 {
-	LoggerAssistant(LL_NORMAL, nullptr) << "Channel [" << c->getName() << "] Say: " << text;
+	LoggerAssistant(LL_NORMAL, nullptr) << "Channel [" << c->cid->nameStr() << "] Say: " << text;
 }
 
 void ClientTUI::actionReply(Channel *c, UserInstance *ui, cstr_t &text)
 {
-	LoggerAssistant(LL_NORMAL, nullptr) << "Channel [" << c->getName() << "] Reply -> " << ui->nickname << ": " << text;
+	LoggerAssistant(LL_NORMAL, nullptr) << "Channel [" << c->cid->nameStr() << "] Reply -> " << ui->uid->nameStr() << ": " << text;
 }
 
 void ClientTUI::actionNotice(Channel *c, UserInstance *ui, cstr_t &text)
 {
-	LoggerAssistant(LL_NORMAL, nullptr) << "Channel [" << c->getName() << "] Notice -> " << ui->nickname << ": " << text;
+	LoggerAssistant(LL_NORMAL, nullptr) << "Channel [" << c->cid->nameStr() << "] Notice -> " << ui->uid->nameStr() << ": " << text;
 }
 
 void ClientTUI::actionJoin(cstr_t &channel)
 {
 	LoggerAssistant(LL_NORMAL, nullptr) << "Channel [" << channel << "] Join";
-	Channel *c = getNetwork()->addChannel(channel);
+	Channel *c = getNetwork()->addChannel(false, ChannelIdTUI(channel));
 	m_module_mgr->onChannelJoin(c);
 }
 
 void ClientTUI::actionLeave(Channel *c)
 {
-	LoggerAssistant(LL_NORMAL, nullptr) << "Channel [" << c->getName() << "] Leave";
+	LoggerAssistant(LL_NORMAL, nullptr) << "Channel [" << c->cid->nameStr() << "] Leave";
 	m_module_mgr->onChannelLeave(c);
 	getNetwork()->removeChannel(c);
 }

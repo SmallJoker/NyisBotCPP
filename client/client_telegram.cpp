@@ -8,23 +8,44 @@
 #include <sstream>
 
 
-// ============ User ID ============
+// ============ User ID / Channel ID ============
 
 struct UserIdTelegram : IImplId {
 	UserIdTelegram(int64_t id) : user_id(id) {}
-	IImplId *copy(void *parent) const { return new UserIdTelegram(user_id); }
+	IImplId *copy(void *parent) const
+	{
+		auto id = new UserIdTelegram(user_id);
+		id->nickptr = &((UserInstance *)parent)->nickname;
+		return id;
+	}
 
 	bool is(const IImplId *other) const
-	{
-		return user_id == ((UserIdTelegram *)other)->user_id;
-	}
+	{ return user_id == ((UserIdTelegram *)other)->user_id; }
 
-	std::string str() const
-	{
-		return std::to_string(user_id);
-	}
+	std::string idStr() const
+	{ return std::to_string(user_id); }
+
+	std::string nameStr() const
+	{ return *nickptr; }
 
 	int64_t user_id;
+	const std::string *nickptr = nullptr;
+};
+
+struct ChannelIdTelegram : IImplId {
+	ChannelIdTelegram(int64_t id) : channel_id(id) {}
+
+	IImplId *copy(void *parent) const
+	{ return new ChannelIdTelegram(channel_id); }
+
+	bool is(const IImplId *other) const
+	{ return channel_id == ((ChannelIdTelegram *)other)->channel_id; }
+
+	std::string idStr() const { return std::to_string(channel_id); }
+	std::string nameStr() const { return name; }
+
+	int64_t channel_id;
+	std::string name;
 };
 
 
@@ -35,7 +56,7 @@ public:
 	void mention(UserInstance *ui)
 	{
 		*m_os << "[" << ui->nickname << "](tg://user?id="
-			<< ui->uid->str() << ")";
+			<< ui->uid->idStr() << ")";
 	}
 
 	void beginImpl(IRC_Color color)
@@ -105,7 +126,7 @@ void ClientTelegram::actionSay(Channel *c, cstr_t &text)
 		return;
 
 	picojson::object inp;
-	inp["chat_id"] = picojson::value(c->getName());
+	inp["chat_id"] = picojson::value(c->cid->idStr());
 	inp["text"] = picojson::value(text);
 
 	REQUEST_WRAP(out, "POST", "sendMessage", &inp);
@@ -119,7 +140,7 @@ void ClientTelegram::actionReply(Channel *c, UserInstance *ui, cstr_t &text)
 	*fmt << ": `" << text << "`";
 
 	picojson::object inp;
-	inp["chat_id"] = picojson::value(c->getName());
+	inp["chat_id"] = picojson::value(c->cid->idStr());
 	inp["parse_mode"] = picojson::value("MarkdownV2");
 	inp["text"] = picojson::value(fmt->str());
 
@@ -128,7 +149,8 @@ void ClientTelegram::actionReply(Channel *c, UserInstance *ui, cstr_t &text)
 
 void ClientTelegram::actionNotice(Channel *c, UserInstance *ui, cstr_t &text)
 {
-	Channel *ui_c = joinChannelIfNeeded(ui->nickname);
+	ChannelIdTelegram cid(((UserIdTelegram *)ui->uid)->user_id);
+	Channel *ui_c = joinChannelIfNeeded(true, &cid);
 	actionSay(ui_c, "NOTICE : " + text);
 }
 
@@ -140,7 +162,7 @@ void ClientTelegram::actionJoin(cstr_t &channel)
 void ClientTelegram::actionLeave(Channel *c)
 {
 	picojson::object inp;
-	inp["chat_id"] = picojson::value(c->getName());
+	inp["chat_id"] = picojson::value(c->cid->idStr());
 
 	REQUEST_WRAP(out, "POST", "leaveChat", &inp);
 	if (out)
@@ -228,7 +250,8 @@ picojson::value *ClientTelegram::requestREST(cstr_t &method, cstr_t &url, picojs
 	if (post_json) {
 		con->enqueueHTTP_Send(picojson::value(*post_json).serialize());
 	}
-	con->connect();
+	if (!con->connect())
+		return nullptr; // Timeout?
 
 	// Connection: Receive
 	std::unique_ptr<picojson::value> json(new picojson::value());
@@ -255,15 +278,15 @@ picojson::value *ClientTelegram::requestREST(cstr_t &method, cstr_t &url, picojs
 	return json.release();
 }
 
-Channel *ClientTelegram::joinChannelIfNeeded(cstr_t &channel_id)
+Channel *ClientTelegram::joinChannelIfNeeded(bool is_private, IImplId *cid)
 {
-	Channel *c = m_network->getChannel(channel_id);
+	Channel *c = m_network->getChannel(*cid);
 	if (c)
 		return c;
 
 	picojson::object inp;
-	inp["chat_id"] = picojson::value(channel_id);
-	c = m_network->addChannel(channel_id);
+	inp["chat_id"] = picojson::value(cid->idStr());
+	c = m_network->addChannel(is_private, *cid);
 
 	REQUEST_WRAP(out_admins, "POST", "getChatAdministrators", &inp);
 	if (out_admins) {
@@ -274,7 +297,10 @@ Channel *ClientTelegram::joinChannelIfNeeded(cstr_t &channel_id)
 		}
 	}
 
-	m_module_mgr->onChannelJoin(c);
+	if (!c->isPrivate()) {
+		// TODO: Solve nested callbacks
+		m_module_mgr->onChannelJoin(c);
+	}
 	return c;
 }
 
@@ -300,8 +326,9 @@ void ClientTelegram::handleMessage(cstr_t &type, picojson::value &v)
 	if (!v_from.is<picojson::object>())
 		return; // Global infomation/notices
 
-	std::string channel(std::to_string(v.get("chat").get("id").get<int64_t>()));
-	Channel *c = joinChannelIfNeeded(channel);
+	ChannelIdTelegram cid(v.get("chat").get("id").get<int64_t>());
+	bool is_private = v.get("chat").get("type").get<std::string>() == "private";
+	Channel *c = joinChannelIfNeeded(is_private, &cid);
 
 	int64_t user_id = v_from.get("id").get<int64_t>();
 	if (user_id == m_my_user_id)

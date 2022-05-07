@@ -27,7 +27,6 @@ Connection *Connection::createStream(cstr_t &address, int port)
 	curl_easy_setopt(con->m_curl, CURLOPT_CONNECT_ONLY, 1L);
 	curl_easy_setopt(con->m_curl, CURLOPT_TCP_KEEPALIVE, 1L);
 	curl_easy_setopt(con->m_curl, CURLOPT_USE_SSL, (long)CURLUSESSL_ALL);
-	curl_easy_setopt(con->m_curl, CURLOPT_TIMEOUT_MS, (long)CURL_TIMEOUT);
 
 	curl_easy_setopt(con->m_curl, CURLOPT_VERBOSE, 1L);
 	return con;
@@ -37,7 +36,6 @@ Connection *Connection::createHTTP(cstr_t &method, cstr_t &url)
 {
 	Connection *con = new Connection(CT_HTTP);
 	curl_easy_setopt(con->m_curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2_0);
-	curl_easy_setopt(con->m_curl, CURLOPT_TIMEOUT_MS, (long)CURL_TIMEOUT);
 	curl_easy_setopt(con->m_curl, CURLOPT_URL, url.c_str());
 
 	if (method == "GET")
@@ -92,11 +90,13 @@ Connection::Connection(ConnectionType ct) :
 	// Open connection
 	m_curl = curl_easy_init();
 	ASSERT(m_curl, "CURL init failed");
+
+	curl_easy_setopt(m_curl, CURLOPT_TIMEOUT, CURL_TIMEOUT_MS);
 }
 
 Connection::~Connection()
 {
-	m_is_alive = false;
+	m_connected = false;
 
 	if (m_thread) {
 		pthread_join(m_thread, nullptr);
@@ -140,33 +140,37 @@ void Connection::enqueueHTTP_Send(std::string && data)
 	*/
 }
 
-void Connection::connect()
+bool Connection::connect()
 {
 	curl_easy_setopt(m_curl, CURLOPT_HTTPHEADER, m_http_headers);
 	CURLcode res = curl_easy_perform(m_curl);
 
-	ASSERT(res == CURLE_OK, "curl failed: " << curl_easy_strerror(res));
+	m_connected = (res == CURLE_OK);
+	if (!m_connected) {
+		ERROR("CURL failed: " << curl_easy_strerror(res));
+		return false;
+	}
 
 	if (m_type == CT_STREAM) {
-		m_is_alive = true;
+		// Start async receive thread
 		int status = pthread_create(&m_thread, nullptr, &recvAsyncStream, this);
 
 		if (status != 0) {
-			m_is_alive = false;
+			m_connected = false;
 			ERROR("pthread failed: " << strerror(status));
 		}
-	} else if (m_type == CT_WEBSOCKET) {
-		m_is_alive = true;
 	}
-	// For HTTP, the request is already done now.
+
+	// HTTP connection: the request is already done now.
 
 	// https://gcc.gnu.org/bugzilla/show_bug.cgi?id=67791
 	//m_thread = new std::thread(recvAsync, this);
+	return m_connected;
 }
 
 bool Connection::send(cstr_t &data) const
 {
-	if (!m_is_alive) {
+	if (!m_connected) {
 		WARN("Connection is dead.");
 		return false;
 	}
@@ -255,7 +259,7 @@ void *Connection::recvAsyncStream(void *con_p)
 	std::string data;
 
 	LOG("Start!");
-	while (con->m_is_alive) {
+	while (con->m_connected) {
 		size_t nread = con->recv(data);
 		if (nread == 0) {
 			SLEEP_MS(100);

@@ -9,6 +9,7 @@ class IModule;
 class Settings;
 struct ClientTelegramActionEntry;
 struct ClientTelegramUserData;
+struct IImplId;
 
 class ClientTelegram : public IClient {
 public:
@@ -37,7 +38,7 @@ private:
 	// post_json: managed by caller
 	// return:    managed by caller
 	picojson::value *requestREST(cstr_t &method, cstr_t &url, picojson::object *post_json = nullptr);
-	Channel *joinChannelIfNeeded(cstr_t &channel_id);
+	Channel *joinChannelIfNeeded(bool is_private, IImplId *cid);
 	ClientTelegramUserData *getUserDataOrCreate(UserInstance *ui);
 
 	static const ClientTelegramActionEntry s_actions[];

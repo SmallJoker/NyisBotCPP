@@ -194,6 +194,11 @@ void test_SettingType_util()
 		Settings::sanitizeKey(text);
 		TEST_CHECK(text == "valid_key");
 	}
+
+	// Base64 data
+	std::string base64(base64encode(text.c_str(), text.size()));
+	TEST_CHECK(base64 == "MjkwMyBDMEZGRUUgMS41NUUxIA==");
+	TEST_CHECK(Settings::isKeyValid(base64) == true);
 }
 
 void test_Settings(Unittest *ut)

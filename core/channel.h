@@ -12,6 +12,8 @@ class IUserOwner;
 // Base class to keep Client-specific data
 
 struct IImplId {
+	DISABLE_COPY(IImplId)
+
 	virtual ~IImplId() = default;
 	// Manual copy
 	virtual IImplId *copy(void *parent) const = 0;
@@ -19,8 +21,11 @@ struct IImplId {
 	// ID comparison
 	virtual bool is(const IImplId *other) const = 0;
 
-	// For IFormatter
-	virtual std::string str() const = 0;
+	// Converts the ID to a string representation
+	virtual std::string idStr() const = 0;
+
+	// Readable assigned name
+	virtual std::string nameStr() const = 0;
 
 protected:
 	IImplId() = default;
@@ -36,7 +41,7 @@ public:
 
 	int getRefs() const { return m_references; }
 
-	IImplId *uid;
+	IImplId const *uid;
 
 	std::string nickname;
 	bool is_bot = false;
@@ -95,21 +100,17 @@ protected:
 
 class Channel : public IUserOwner {
 public:
-	Channel(cstr_t &name, IClient *cli);
+	Channel(bool is_private, const IImplId &cid, IClient *cli);
 	~Channel();
 
-	cstr_t &getName() const
-	{ return m_name; }
+	IImplId const *cid;
 
 	// Settings-safe name
 	cstr_t &getSettingsName() const
 	{ return m_name_settings; }
 
 	bool isPrivate() const
-	{ return isPrivate(m_name); }
-
-	static bool isPrivate(cstr_t &name)
-	{ return name[0] != '#'; }
+	{ return m_is_private; }
 
 	Containers *getContainers()
 	{ return m_containers; }
@@ -121,7 +122,7 @@ public:
 	void leave();
 
 private:
-	std::string m_name;
+	bool m_is_private;
 	std::string m_name_settings;
 
 	// Per-channel data
@@ -134,8 +135,8 @@ public:
 	Network(IClient *cli) : IUserOwner(cli) {}
 	~Network();
 
-	Channel *addChannel(cstr_t &name);
-	Channel *getChannel(cstr_t &name) const;
+	Channel *addChannel(bool is_private, const IImplId &cid);
+	Channel *getChannel(const IImplId &cid) const;
 	bool removeChannel(Channel *c);
 	bool contains(Channel *c) const;
 

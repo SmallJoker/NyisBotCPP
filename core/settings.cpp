@@ -105,11 +105,11 @@ void Settings::sanitizeKey(std::string &key)
 	}
 	if (k == key.size())
 		return; // None
-
 	uint32_t hash = hashELF32(&blacklist[0], b);
 	key.resize(k + 1 + 8);
 	snprintf(&key[k], key.size() - k + 1, "_%08X", hash);
 }
+
 
 void Settings::sanitizeValue(std::string &value)
 {
@@ -142,19 +142,22 @@ cstr_t &Settings::getAbsolute(cstr_t &key) const
 
 bool Settings::setAbsolute(cstr_t &key, cstr_t &value)
 {
-	if (m_is_fork)
-		return m_parent->setAbsolute(key, value);
-
 	if (!isKeyValid(key)) {
 		WARN("Invalid key '" << key << "'");
 		return false;
 	}
 
+	if (m_is_fork)
+		return m_parent->setAbsolute(key, value);
+
+	std::string key_safe(key);
+	sanitizeKey(key_safe);
+
 	MutexLock _(m_lock);
 
-	m_modified.insert(key);
-	m_settings[key] = value;
-	sanitizeValue(m_settings[key]);
+	m_modified.insert(key_safe);
+	m_settings[key_safe] = value;
+	sanitizeValue(m_settings[key_safe]);
 	return true;
 }
 
@@ -163,13 +166,16 @@ bool Settings::removeAbsolute(cstr_t &key)
 	if (m_is_fork)
 		return m_parent->removeAbsolute(key);
 
+	std::string key_safe(key);
+	sanitizeKey(key_safe);
+
 	MutexLock _(m_lock);
 
-	auto it = m_settings.find(key);
+	auto it = m_settings.find(key_safe);
 	if (it == m_settings.end())
 		return false;
 
-	m_modified.insert(key);
+	m_modified.insert(key_safe);
 	m_settings.erase(it);
 	return true;
 }
@@ -291,7 +297,7 @@ bool Settings::syncFileContents(SyncReason reason)
 				break;
 
 			size_t pos = line.find_first_of('=');
-			if (pos == std::string::npos || pos == 0) {
+			if (pos == std::string::npos) {
 				WARN("Syntax error in line " << line_n << ": " << line);
 				break;
 			}

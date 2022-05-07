@@ -3,6 +3,7 @@
 #include "client_irc.h"
 #include "connection.h"
 #include "channel.h"
+#include "iimpl_basic.h"
 #include "logger.h"
 #include "module.h"
 #include "settings.h"
@@ -11,26 +12,23 @@
 #include <memory> // unique_ptr
 
 
-// ============ User ID ============
+// ============ User ID / Channel ID ============
 
-struct UserIdIRC : IImplId {
-	UserIdIRC(cstr_t &nick) : nickptr(&nick) {}
+struct UserIdIRC : UserIdBasic {
+	UserIdIRC(cstr_t &nick) : UserIdBasic(nick) {}
 
-	IImplId *copy(void *parent) const
+	IImplId *copy(void *parent) const override
 	{
 		UserInstance *ui = (UserInstance *)parent;
 		ui->nickname = *nickptr;
 		return new UserIdIRC(ui->nickname);
 	}
 
-	bool is(const IImplId *other) const
-	{ return *nickptr == *((UserIdIRC *)other)->nickptr; }
-
-	std::string str() const { return *nickptr; }
-
-	const std::string *nickptr;
 	std::string hostmask;
 };
+
+typedef ChannelIdBasic ChannelIdIRC;
+
 
 
 // ============ Formatter ============
@@ -161,18 +159,18 @@ void ClientIRC::sendRaw(cstr_t &text)
 
 void ClientIRC::actionSay(Channel *c, cstr_t &text)
 {
-	sendRaw("PRIVMSG " + c->getName() + " :" + text);
+	sendRaw("PRIVMSG " + c->cid->idStr() + " :" + text);
 }
 
 void ClientIRC::actionReply(Channel *c, UserInstance *ui, cstr_t &text)
 {
-	actionSay(c, ui->nickname + ": " + text);
+	actionSay(c, ui->uid->nameStr() + ": " + text);
 }
 
 void ClientIRC::actionNotice(Channel *c, UserInstance *ui, cstr_t &text)
 {
 	// Some IRC clients show this text in a separate tab... :(
-	sendRaw("NOTICE " + ui->nickname + " :" + text);
+	sendRaw("NOTICE " + ui->uid->idStr() + " :" + text);
 }
 
 void ClientIRC::actionJoin(cstr_t &channel)
@@ -182,7 +180,9 @@ void ClientIRC::actionJoin(cstr_t &channel)
 
 void ClientIRC::actionLeave(Channel *c)
 {
-	sendRaw("PART " + c->getName());
+	if (c->isPrivate())
+		return;
+	sendRaw("PART " + c->cid->idStr());
 }
 
 IFormatter *ClientIRC::createFormatter() const
@@ -304,10 +304,10 @@ void ClientIRC::handleClientEvent(cstr_t &status, NetworkEvent *e)
 
 	if (status == "JOIN") {
 		// nick!host JOIN :channel
-		cstr_t &channel = e->text;
-		Channel *c = m_network->getChannel(channel);
+		ChannelIdIRC cid(e->text);
+		Channel *c = m_network->getChannel(cid);
 		if (!c) {
-			c = m_network->addChannel(channel);
+			c = m_network->addChannel(false, cid);
 			// Add bot to channel
 			c->addUser(UserIdIRC(m_nickname));
 		}
@@ -363,8 +363,8 @@ void ClientIRC::handleClientEvent(cstr_t &status, NetworkEvent *e)
 	}
 	if (status == "PART" || status == "KICK") {
 		// nick!host PART channel :reason
-		cstr_t &channel = e->args[2];
-		Channel *c = m_network->getChannel(channel);
+		ChannelIdIRC cid(e->args[2]);
+		Channel *c = m_network->getChannel(cid);
 		UserInstance *ui = c->getUser(e->nickname);
 		if (!c || !ui) {
 			ERROR("Invalid channel or user");
@@ -466,10 +466,11 @@ void ClientIRC::handleChatMessage(cstr_t &status, NetworkEvent *e)
 			return;
 		}
 
-		Channel *c = m_network->getChannel(channel);
+		ChannelIdIRC cid(channel);
+		Channel *c = m_network->getChannel(cid);
 		if (!c) {
-			ERROR("Got PRIVMSG before JOIN:  " << channel);
-			c = m_network->addChannel(channel);
+			ERROR("Got PRIVMSG before JOIN:  " << cid.nameStr());
+			c = m_network->addChannel(false, cid);
 		}
 
 		m_module_mgr->onUserSay(c, m_network->getUser(e->nickname), e->text);
@@ -510,10 +511,10 @@ void ClientIRC::handleServerMessage(cstr_t &status, NetworkEvent *e)
 {
 	if (status == "353") {
 		// User list
-		cstr_t &channel = e->args[4];
+		ChannelIdIRC cid(e->args[4]);
 		std::vector<std::string> users = strsplit(e->text);
 
-		Channel *c = m_network->addChannel(channel);
+		Channel *c = m_network->addChannel(false, cid);
 		for (auto &name : users) {
 			// Trim first character if necessary
 			if (strchr("~&@%+", name[0]))

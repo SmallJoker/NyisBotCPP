@@ -25,7 +25,7 @@ public:
 	void setHTTP_URL(cstr_t &url);
 	void addHTTP_Header(cstr_t &what);
 	void enqueueHTTP_Send(std::string && data);
-	void connect();
+	bool connect();
 
 	bool send(cstr_t &data) const;
 	std::string *popRecv();
@@ -35,7 +35,7 @@ private:
 	Connection(ConnectionType ct);
 
 	static const unsigned MAX_SEND_RETRIES = 5;
-	static const unsigned CURL_TIMEOUT = 2000;
+	static const long CURL_TIMEOUT_MS = 5000;
 	static const unsigned RECEIVE_BUFSIZE = 1024;
 
 	size_t recv(std::string &data);
@@ -47,7 +47,7 @@ private:
 	const ConnectionType m_type;
 	void *m_curl;
 	curl_slist *m_http_headers = nullptr;
-	bool m_is_alive = false;
+	bool m_connected = false;
 
 	// Receive thread
 	pthread_t m_thread = 0;

@@ -61,7 +61,7 @@ private:
 	static int l_get_name(lua_State *L)
 	{
 		ChannelRef *ref = checkClass(L);
-		lua_pushstring(L, ref->m_channel->getName().c_str());
+		lua_pushstring(L, ref->m_channel->cid->nameStr().c_str());
 		return 1;
 	}
 
@@ -102,7 +102,7 @@ private:
 		ChannelRef *ref = checkClass(L);
 		UserInstance *ui = (UserInstance *)lua_touserdata(L, 2);
 		if (ref->m_channel->contains(ui))
-			lua_pushstring(L, ui->nickname.c_str());
+			lua_pushstring(L, ui->uid->nameStr().c_str());
 		else
 			lua_pushnil(L);
 		return 1;
@@ -130,7 +130,7 @@ private:
 
 const char *ChannelRef::m_classname = "ChannelRef";
 const luaL_reg ChannelRef::m_functions[] = {
-	{"get_name",  l_get_name},
+	{"get_name", l_get_name},
 	{"say",    l_say},
 	{"reply",  l_reply},
 	{"notice", l_notice},

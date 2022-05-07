@@ -94,16 +94,19 @@ IFormatter *IUserOwner::createFormatter() const
 
 // ================= Channel =================
 
-Channel::Channel(cstr_t &name, IClient *cli) :
-	IUserOwner(cli)
+Channel::Channel(bool is_private, const IImplId &cid, IClient *cli) :
+	IUserOwner(cli), cid(cid.copy(this))
 {
-	m_name = name;
-	m_client = cli;
+	m_is_private = is_private;
 	m_containers = new Containers();
 
-	if (!isPrivate(name)) {
-		m_name_settings = name.substr(name[0] == '#');
-		Settings::sanitizeKey(m_name_settings);
+	if (is_private) {
+		// Error indicator
+		m_name_settings = "PRIVATE_" + this->cid->nameStr();
+	} else {
+		m_name_settings = this->cid->idStr();
+		if (m_name_settings[0] == '#') // IRC compat
+			m_name_settings = m_name_settings.substr(1);
 	}
 }
 
@@ -115,6 +118,9 @@ Channel::~Channel()
 	for (UserInstance *ui : m_users)
 		ui->dropRef();
 	m_users.clear();
+
+	delete cid;
+	cid = nullptr;
 }
 
 void Channel::say(cstr_t &text)
@@ -151,22 +157,20 @@ Network::~Network()
 	m_users.clear();
 }
 
-Channel *Network::addChannel(cstr_t &name)
+Channel *Network::addChannel(bool is_private, const IImplId &cid)
 {
-	for (Channel *it : m_channels) {
-		if (it->getName() == name)
-			return it;
+	Channel *c = getChannel(cid);
+	if (!c) {
+		c = new Channel(is_private, cid, m_client);
+		m_channels.insert(c);
 	}
-
-	Channel *c = new Channel(name, m_client);
-	m_channels.insert(c);
 	return c;
 }
 
-Channel *Network::getChannel(cstr_t &name) const
+Channel *Network::getChannel(const IImplId &cid) const
 {
 	for (Channel *it : m_channels) {
-		if (it->getName() == name)
+		if (it->cid->is(&cid))
 			return it;
 	}
 	return nullptr;

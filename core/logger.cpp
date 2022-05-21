@@ -33,6 +33,7 @@ void write_datetime(std::ostream *os)
 Logger::Logger()
 {
 	m_sink = new std::ostringstream();
+	m_file = nullptr;
 }
 
 Logger::~Logger()

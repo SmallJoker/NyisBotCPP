@@ -8,7 +8,9 @@
 class UserInstance;
 class Channel;
 
-class ICallbackHandler {
+struct ContainerOwner {};
+
+class ICallbackHandler : public ContainerOwner {
 public:
 	virtual ~ICallbackHandler() {}
 
@@ -22,7 +24,7 @@ public:
 };
 
 
-struct IContainer {
+struct IContainer : public ContainerOwner {
 	IContainer() = default;
 	virtual ~IContainer() {}
 	DISABLE_COPY(IContainer);
@@ -37,13 +39,13 @@ public:
 	DISABLE_COPY(Containers);
 
 	// Adds a new or replaces an existing container
-	void set(const void *owner, IContainer *data);
-	IContainer *get(const void *owner) const;
-	bool remove(const void *owner);
-	bool move(const void *old_owner, const void *new_owner);
+	void set(const ContainerOwner *owner, IContainer *data);
+	IContainer *get(const ContainerOwner *owner) const;
+	bool remove(const ContainerOwner *owner);
+	bool move(const ContainerOwner *old_owner, const ContainerOwner *new_owner);
 	inline size_t size() const { return m_data.size(); }
 
 private:
-	std::map<const void *, IContainer *> m_data;
+	std::map<const ContainerOwner *, IContainer *> m_data;
 };
 

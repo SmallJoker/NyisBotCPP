@@ -31,20 +31,21 @@ struct DemoContainer : public IContainer {
 void test_Module_Container()
 {
 	{
+		ContainerOwner ref;
 		Containers c;
 		instances = 0;
 
-		c.set(&c,      new DemoContainer(11));
+		c.set(&ref,    new DemoContainer(11));
 		c.set(nullptr, new DemoContainer(55));
 
 		TEST_CHECK(instances == 2);
 
-		DemoContainer *dc = (DemoContainer *)c.get(&c);
+		DemoContainer *dc = (DemoContainer *)c.get(&ref);
 		TEST_CHECK(dc != nullptr && dc->num == 11);
 
-		TEST_CHECK(c.remove(&c) == true);
-		TEST_CHECK(c.remove(&c) == false);
-		TEST_CHECK(c.get(&c) == nullptr);
+		TEST_CHECK(c.remove(&ref) == true);
+		TEST_CHECK(c.remove(&ref) == false);
+		TEST_CHECK(c.get(&ref) == nullptr);
 		TEST_CHECK(instances == 1);
 
 		dc = (DemoContainer *)c.get(nullptr);

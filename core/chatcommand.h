@@ -13,7 +13,7 @@ class UserInstance;
 
 typedef CHATCMD_FUNC(IModule::*ChatCommandAction);
 
-class ChatCommand {
+class ChatCommand : public ContainerOwner {
 public:
 	ChatCommand(IModule *module);
 

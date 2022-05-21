@@ -160,5 +160,5 @@ public:
 	}
 
 protected:
-	GameF_nbm() {};
+	GameF_nbm() {}
 };

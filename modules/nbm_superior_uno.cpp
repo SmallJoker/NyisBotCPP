@@ -10,7 +10,7 @@
 #include <queue>
 #include <sstream>
 
-static const char STATUSUPDATE = '\0';
+static ContainerOwner STATUSUPDATE;
 
 struct Card {
 	struct Suit {
@@ -633,7 +633,7 @@ public:
 		} else if (face_s == "R") {
 			if (g->getPlayerCount() > 2) {
 				g->dir_forwards ^= true; // Toggle
-			} else if (strcmp(g->top_card.face, "WD4") != 0) {
+			} else if (strcmp(g->top_card.face, "WD4") == 0) {
 				// Acts as Skip for 2 players
 				// do not skip when reversing the draw stack ("no u!")
 				pending_autodraw = true;

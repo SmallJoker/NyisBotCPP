@@ -9,7 +9,7 @@ Containers::~Containers()
 	}
 }
 
-void Containers::set(const void *owner, IContainer *data)
+void Containers::set(const ContainerOwner *owner, IContainer *data)
 {
 	IContainer *existing = get(owner);
 	if (existing && existing != data) {
@@ -23,13 +23,13 @@ void Containers::set(const void *owner, IContainer *data)
 	m_data.insert({owner, data});
 }
 
-IContainer *Containers::get(const void *owner) const
+IContainer *Containers::get(const ContainerOwner *owner) const
 {
 	auto it = m_data.find(owner);
 	return (it == m_data.end()) ? nullptr : it->second;
 }
 
-bool Containers::remove(const void *owner)
+bool Containers::remove(const ContainerOwner *owner)
 {
 	auto it = m_data.find(owner);
 	if (it == m_data.end()) {
@@ -43,7 +43,7 @@ bool Containers::remove(const void *owner)
 	return true;
 }
 
-bool Containers::move(const void *old_owner, const void *new_owner)
+bool Containers::move(const ContainerOwner *old_owner, const ContainerOwner *new_owner)
 {
 	auto it = m_data.find(old_owner);
 	if (it == m_data.end() || m_data.find(new_owner) != m_data.end())

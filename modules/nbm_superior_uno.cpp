@@ -631,12 +631,14 @@ public:
 			g->draw_count += 4;
 			pending_autodraw = !g->checkMode(UnoGame::UM_STACK_WD4);
 		} else if (face_s == "R") {
-			if (g->getPlayerCount() > 2) {
-				g->dir_forwards ^= true; // Toggle
-			} else if (strcmp(g->top_card.face, "WD4") == 0) {
-				// Acts as Skip for 2 players
+			g->dir_forwards ^= true; // Toggle
+
+			if (strcmp(g->top_card.face, "WD4") == 0) {
 				// do not skip when reversing the draw stack ("no u!")
 				pending_autodraw = true;
+			} else if (g->getPlayerCount() == 2) {
+				// Acts as Skip for 2 players
+				g->turnNext();
 			}
 		} else if (face_s == "S") {
 			g->turnNext();

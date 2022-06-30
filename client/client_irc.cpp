@@ -218,13 +218,13 @@ bool ClientIRC::run()
 
 	NetworkEvent e;
 
-	// Extract regular text if available
-	auto text_pos = what->find(':');
+	// Extract regular text if available. Attention! IPv6 may contain single ':'
+	auto text_pos = what->find(" :");
 	{
 		if (text_pos == std::string::npos)
 			text_pos = what->size();
 		else
-			e.text = what->substr(text_pos + 1);
+			e.text = what->substr(text_pos + 2);
 	}
 
 	// Split by spaces into "e.args"
@@ -287,7 +287,7 @@ bool ClientIRC::run()
 
 void ClientIRC::handleUnknown(cstr_t &msg)
 {
-	VERBOSE("Unknown: " << msg);
+	LOG("Unhandled command: " << msg);
 }
 
 void ClientIRC::handleError(cstr_t &status, NetworkEvent *e)

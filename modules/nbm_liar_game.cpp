@@ -28,6 +28,7 @@ struct LPlayer : public IContainer {
 				*fmt << (i + 1);
 
 			std::string inner("[" + std::string(cards[i]) + "]");
+			fmt->begin(FT_BOLD);
 			if (*(cards[i]) == 'Q') {
 				// Red queens
 				fmt->begin(IC_RED);
@@ -35,6 +36,7 @@ struct LPlayer : public IContainer {
 				fmt->end(FT_COLOR);
 			} else // All other cards
 				*fmt << inner;
+			fmt->end(FT_BOLD);
 
 			if (i + 1 < cards.size())
 				*fmt << ' ';
@@ -135,6 +137,7 @@ public:
 		lcmd.add("leave", (ChatCommandAction)&nbm_liar_game::cmd_leave, this);
 		lcmd.add("start", (ChatCommandAction)&nbm_liar_game::cmd_start, this);
 		lcmd.add("add",   (ChatCommandAction)&nbm_liar_game::cmd_add, this);
+		lcmd.add("p",     (ChatCommandAction)&nbm_liar_game::cmd_add, this);
 		lcmd.add("check", (ChatCommandAction)&nbm_liar_game::cmd_check, this);
 		lcmd.add("cards", (ChatCommandAction)&nbm_liar_game::cmd_cards, this);
 		m_commands = &lcmd;
@@ -188,17 +191,19 @@ public:
 		size_t amount = p->cards.size();
 		if (amount == 0) {
 			// Done!
-			if (ui == g->current) {
+			if (!played_card) {
 				c->say(ui->nickname + " has no cards left. Congratulations, you're a winner!");
+				g->removePlayer(ui);
 				return true;
-			} else if (played_card) {
-				std::unique_ptr<IFormatter> fmt(c->createFormatter());
-				fmt->mention(ui);
-				*fmt << " played ";
-				fmt->begin(IC_ORANGE); *fmt << "their last card"; fmt->end(FT_COLOR);
-				*fmt << "!";
-				c->say(fmt->str());
 			}
+
+			std::unique_ptr<IFormatter> fmt(c->createFormatter());
+			fmt->mention(ui);
+			*fmt << " played ";
+			fmt->begin(IC_ORANGE); *fmt << "their last card"; fmt->end(FT_COLOR);
+			*fmt << "!";
+			c->say(fmt->str());
+
 			return false;
 		}
 		if (amount >= 4) {
@@ -237,7 +242,7 @@ public:
 			return false;
 		}
 
-		if (amount <= g->MIN_PLAYERS && ui == g->current) {
+		if (amount <= 3 && ui == g->current) {
 			std::unique_ptr<IFormatter> fmt(c->createFormatter());
 			fmt->mention(ui);
 			*fmt << " has ";
@@ -330,7 +335,7 @@ public:
 
 		ui = g->current;
 		c->say("Game started! Player " + ui->nickname +
-			" may play the first card using \"$add <'main card'> <card nr.> [<card nr.> [<card nr.>]]\"" +
+			" may play the first card using \"$p <'main card'> <card nr.> [<card nr.> [<card nr.>]]\"" +
 			" (Card nr. from your hand)");
 
 		for (UserInstance *ui : g->getAllPlayers())
@@ -412,10 +417,10 @@ public:
 		}
 		g->stack_last = indices.size();
 
-		// Cards added. Update game progress
-		if (updateCardsWin(c, ui, true))
-			g->removePlayer(ui);
-		else
+		// Previously played cards were not checked -> player wins.
+		updateCardsWin(c, g->getPrevPlayer(), false);
+		// Current player may not win yet
+		if (!updateCardsWin(c, ui, true))
 			g->turnNext();
 
 		if (!processGameUpdate(c))
@@ -479,13 +484,11 @@ public:
 
 		if (updateCardsWin(c, ui_prev, false)) {
 			// User played their last card and it was correct
-			g->removePlayer(ui_prev);
 		} else {
 			c->notice(ui_prev, LPlayer::format(c, p_prev->cards, true));
 		}
 		if (updateCardsWin(c, ui, false)) {
-			// Obscure win: discard all 4 in the hand
-			g->removePlayer(ui);
+			// Obscure win: discard all cards in hand
 		} else {
 			c->notice(ui, LPlayer::format(c, p->cards, true));
 		}

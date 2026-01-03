@@ -10,46 +10,11 @@
 #include <memory> // std::unique_ptr
 #include <random>
 #include <sstream>
+#include "string.h" // strcmp
 
 // Per-channel-member
 struct LPlayer : public IContainer {
 	std::string dump() const { return "LPlayer"; }
-
-	static void format(IFormatter *fmt, const std::vector<const char *> &cards,
-		bool hand_info = false)
-	{
-		if (hand_info)
-			*fmt << "Your cards: ";
-
-		fmt->begin(IC_BLACK);
-		fmt->end(FT_COLOR); // Clear previous formatting
-		for (size_t i = 0; i < cards.size(); ++i) {
-			if (hand_info)
-				*fmt << (i + 1);
-
-			std::string inner("[" + std::string(cards[i]) + "]");
-			fmt->begin(FT_BOLD);
-			if (*(cards[i]) == 'Q') {
-				// Red queens
-				fmt->begin(IC_RED);
-				*fmt << inner;
-				fmt->end(FT_COLOR);
-			} else // All other cards
-				*fmt << inner;
-			fmt->end(FT_BOLD);
-
-			if (i + 1 < cards.size())
-				*fmt << ' ';
-		}
-	}
-
-	static std::string format(IUserOwner *iuo, const std::vector<const char *> &cards,
-		bool hand_info = false)
-	{
-		std::unique_ptr<IFormatter> fmt(iuo->createFormatter());
-		format(fmt.get(), cards, hand_info);
-		return fmt->str();
-	}
 
 	static void shuffle(std::vector<const char *> &cards)
 	{
@@ -122,6 +87,50 @@ public:
 		return true;
 	}
 
+	void fmtWriteCards(IFormatter *fmt, const std::vector<const char *> &cards,
+		bool hand_info = false)
+	{
+		if (hand_info)
+			*fmt << "Your cards: ";
+
+		fmt->begin(IC_BLACK);
+		fmt->end(FT_COLOR); // Clear previous formatting
+		for (size_t i = 0; i < cards.size(); ++i) {
+		    const char *card = cards[i];
+			if (hand_info)
+				*fmt << (i + 1);
+
+			std::string inner("[" + std::string(card) + "]");
+			fmt->begin(FT_BOLD);
+			if (*card == 'Q') {
+				// Red queens
+				fmt->begin(IC_RED);
+				*fmt << inner;
+				fmt->end(FT_COLOR);
+			} else if (card == main_face) {
+				// Blue it it matches the main card
+				fmt->begin(IC_BLUE);
+				*fmt << inner;
+				fmt->end(FT_COLOR);
+			} else {
+				// All other cards
+				*fmt << inner;
+			}
+			fmt->end(FT_BOLD);
+
+			if (i + 1 < cards.size())
+				*fmt << ' ';
+		}
+	}
+
+	std::string fmtWriteCardsStr(const std::vector<const char *> &cards,
+		bool hand_info = false)
+	{
+		std::unique_ptr<IFormatter> fmt(m_channel->createFormatter());
+		fmtWriteCards(fmt.get(), cards, hand_info);
+		return fmt->str();
+	}
+
 	std::vector<const char *> stack;
 	const char *main_face = nullptr;
 	size_t stack_last = 0;
@@ -140,6 +149,7 @@ public:
 		lcmd.add("p",     (ChatCommandAction)&nbm_liar_game::cmd_add, this);
 		lcmd.add("check", (ChatCommandAction)&nbm_liar_game::cmd_check, this);
 		lcmd.add("cards", (ChatCommandAction)&nbm_liar_game::cmd_cards, this);
+		lcmd.add("shufle", (ChatCommandAction)&nbm_liar_game::cmd_cards, this);
 		m_commands = &lcmd;
 	}
 
@@ -169,12 +179,12 @@ public:
 		// Normal ongoing game
 		std::unique_ptr<IFormatter> fmt(c->createFormatter());
 		*fmt << "[LGame] Main card: ";
-		LPlayer::format(fmt.get(), { g->main_face });
+		g->fmtWriteCards(fmt.get(), { g->main_face });
 		*fmt << ", Stack height: " << g->stack.size();
 		*fmt << ". Current player: " << g->current->nickname;
 		c->say(fmt->str());
 
-		c->notice(to_user, LPlayer::format(c, g->getPlayer(to_user)->cards, true));
+		c->notice(to_user, g->fmtWriteCardsStr(g->getPlayer(to_user)->cards, true));
 	}
 
 	// Returns true if the player finished
@@ -231,11 +241,11 @@ public:
 				std::unique_ptr<IFormatter> fmt(c->createFormatter());
 				fmt->mention(ui);
 				*fmt << " can discard four ";
-				LPlayer::format(fmt.get(), discarded);
+				g->fmtWriteCards(fmt.get(), discarded);
 				*fmt << " cards. Left cards: " << p->cards.size();
 
 				c->say(fmt->str());
-	
+
 				// Re-check for win
 				return updateCardsWin(c, ui, false);
 			}
@@ -340,8 +350,8 @@ public:
 
 		for (UserInstance *ui : g->getAllPlayers())
 			updateCardsWin(c, ui, false);
-	
-		c->notice(ui, LPlayer::format(c, g->getPlayer(ui)->cards, true));
+
+		c->notice(ui, g->fmtWriteCardsStr(g->getPlayer(ui)->cards, true));
 	}
 
 	CHATCMD_FUNC(cmd_add)
@@ -383,7 +393,7 @@ public:
 			if (face_c != g->main_face) {
 				std::unique_ptr<IFormatter> fmt(c->createFormatter());
 				*fmt << "Wrong card type! Please pretend to place a card of type ";
-				LPlayer::format(fmt.get(), { g->main_face });
+				g->fmtWriteCards(fmt.get(), { g->main_face }, g->main_face);
 				c->notice(ui, fmt->str());
 				return;
 			}
@@ -460,7 +470,7 @@ public:
 		}
 
 		*fmt << " (";
-		LPlayer::format(fmt.get(), top_cards);
+		g->fmtWriteCards(fmt.get(), top_cards);
 		*fmt << ") ";
 
 		// Previous player draws the cards
@@ -472,7 +482,7 @@ public:
 		g->stack_last = 0;
 		g->main_face = nullptr;
 
-		*fmt << "Complete stack goes to " << ui_prev->nickname << ". ";
+		*fmt << "" << ui_prev->nickname << " gets the stack. ";
 
 		*fmt << g->current->nickname + " may start with an empty stack.";
 		c->say(fmt->str());
@@ -485,12 +495,12 @@ public:
 		if (updateCardsWin(c, ui_prev, false)) {
 			// User played their last card and it was correct
 		} else {
-			c->notice(ui_prev, LPlayer::format(c, p_prev->cards, true));
+			c->notice(ui_prev, g->fmtWriteCardsStr(p_prev->cards, true));
 		}
 		if (updateCardsWin(c, ui, false)) {
 			// Obscure win: discard all cards in hand
 		} else {
-			c->notice(ui, LPlayer::format(c, p->cards, true));
+			c->notice(ui, g->fmtWriteCardsStr(p->cards, true));
 		}
 
 		if (!processGameUpdate(c))
@@ -511,7 +521,7 @@ public:
 		}
 
 		p->shuffle(p->cards);
-		c->notice(ui, LPlayer::format(c, p->cards, true));
+		c->notice(ui, g->fmtWriteCardsStr(p->cards, true));
 	}
 
 private:
